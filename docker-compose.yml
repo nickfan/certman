@@ -1,0 +1,8 @@
+services:
+  certman:
+    build: .
+    entrypoint: ["uv", "run", "certman"]
+    volumes:
+      - ./data:/data
+    environment:
+      CERTMAN_DATA_DIR: /data

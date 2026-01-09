@@ -1,0 +1,24 @@
+# Entry item example for certman
+#
+# Each item file defines a single entry.
+# Filename convention: item_<name>.toml
+# - If you omit `name`, it will be inferred from filename (<name>).
+#
+# This example uses Aliyun and references secrets from data/conf/.env via account_id.
+
+# name is optional; inferred from filename (item_example.toml -> example)
+# name = "example"
+description = "example.com via aliyun"
+primary_domain = "example.com"
+secondary_domains = ["www.example.com"]
+wildcard = false
+
+dns_provider = "aliyun"   # aliyun | cloudflare | route53
+
+# account_id mode requires secrets in .env and will fail config-validate if missing.
+# account_id = "ALI_EXAMPLE"
+
+# Portable mode (optional): embed credentials directly or via ${ENV_VAR}
+# [credentials]
+# access_key_id = "${ALIYUN_ACCESS_KEY_ID}"
+# access_key_secret = "${ALIYUN_ACCESS_KEY_SECRET}"

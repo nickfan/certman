@@ -1,0 +1,37 @@
+[project]
+name = "certman"
+version = "0.1.0"
+description = "SSL certificate management CLI (certbot + DNS plugins)"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "certbot>=5.2.2",
+    "certbot-dns-aliyun>=2.0.0",
+    "pydantic>=2.12.5",
+    "pydantic-settings>=2.12.0",
+    "python-dotenv>=1.2.1",
+    "pyyaml>=6.0.3",
+    "tomli>=2.3.0",
+    "typer>=0.21.1",
+]
+
+[project.scripts]
+certman = "certman.cli:main"
+
+[tool.uv]
+package = true
+
+[tool.setuptools]
+packages = ["certman"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+
+[[tool.uv.index]]
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+default = true
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]

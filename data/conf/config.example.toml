@@ -1,0 +1,36 @@
+# Global config example for certman
+#
+# How config works:
+# - Default global config: data/conf/config.toml
+# - It scans item configs under data/conf/ (default: item_*.toml)
+# - Each item file defines exactly one entry
+#
+# Usage:
+# - Copy this file to data/conf/config.toml
+# - Create one or more item files like data/conf/item_mycert.toml
+# - Templates use suffix `.example.toml` and are not loaded
+# - Put secrets in data/conf/.env (optional; see .env.example)
+
+[global]
+# Base data directory. In docker-compose, this will be /data.
+data_dir = "data"
+
+# ACME server: "staging" or "prod"
+acme_server = "staging"
+
+# Certbot registration email
+email = "admin@example.com"
+
+# Optional directory overrides (relative to data_dir unless absolute)
+conf_dir = "conf"
+run_dir = "run"
+log_dir = "log"
+output_dir = "output"
+
+# Where certbot stores its state (relative to run_dir by default)
+letsencrypt_dir = "letsencrypt"
+
+# Scan item configs under data/conf/
+#
+# Note: templates use the suffix `.example.toml` and are excluded by default.
+scan_items_glob = "item_*.toml"

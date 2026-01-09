@@ -1,0 +1,35 @@
+# certman
+
+# Runtime secrets
+/data/conf/.env
+
+# User config (real files)
+/data/conf/*.toml
+
+# Keep templates tracked
+!/data/conf/config.example.toml
+!/data/conf/item_example.example.toml
+!/data/conf/.env.example
+
+# Ignore legacy/temporary configs
+/data/conf/kumaxiong.toml
+
+# Runtime data
+/data/run/
+/data/log/
+/data/output/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# Tool caches
+.ruff_cache/
+
+.tmp/
+.tmp/*
+
+.DS_Store
+*.egg-info/
+/build/*

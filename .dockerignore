@@ -1,0 +1,23 @@
+# certman
+
+# Never bake secrets/config into images
+/data/conf/.env
+/data/conf/*.toml
+/data/conf/*.yaml
+/data/conf/*.yml
+
+# Never bake runtime data into images
+/data/run/
+/data/log/
+/data/output/
+
+# Allow examples for documentation
+!/data/conf/example.toml
+!/data/conf/example.yaml
+!/data/conf/.env.example
+
+# Python caches
+__pycache__/
+*.py[cod]
+.venv/
+.ruff_cache/
