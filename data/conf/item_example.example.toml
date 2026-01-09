@@ -11,7 +11,7 @@
 description = "example.com via aliyun"
 primary_domain = "example.com"
 secondary_domains = ["www.example.com"]
-wildcard = false
+wildcard = true
 
 dns_provider = "aliyun"   # aliyun | cloudflare | route53
 

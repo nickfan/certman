@@ -5,23 +5,26 @@ name-template: "v$RESOLVED_VERSION"
 tag-template: "v$RESOLVED_VERSION"
 
 categories:
-  - title: "8a1 Features"
+  - title: "Features"
     labels:
       - "feature"
       - "enhancement"
-  - title: "41b Bug Fixes"
+  - title: "Bug Fixes"
     labels:
       - "bug"
       - "fix"
-  - title: "4da Documentation"
+  - title: "Documentation"
     labels:
       - "docs"
-  - title: "9f9 Maintenance"
+  - title: "Maintenance"
     labels:
       - "chore"
       - "refactor"
       - "maintenance"
       - "ci"
+  - title: "Other"
+    labels:
+      - "*"
 
 change-template: "- $TITLE (#$NUMBER) @$AUTHOR"
 

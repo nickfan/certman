@@ -41,7 +41,7 @@ class EntryConfig(BaseModel):
     description: str = ""
     primary_domain: str
     secondary_domains: list[str] = Field(default_factory=list)
-    wildcard: bool = False
+    wildcard: bool = True
 
     dns_provider: str  # cloudflare|route53|aliyun
 
