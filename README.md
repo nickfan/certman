@@ -27,6 +27,9 @@ GitHub Container Registry (GHCR): `ghcr.io/nickfan/certman`
 - `edge`: built from `master`
 - `latest` + `X.Y.Z`: built from git tags like `vX.Y.Z`
 
+If GHCR images are not pullable (403) even though workflow succeeded:
+- Go to GitHub repo **Packages** `certman` **Package settings** set **Visibility** to **Public**.
+
 Run (example):
 
 ```sh
