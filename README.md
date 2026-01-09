@@ -18,6 +18,24 @@ Default `--data-dir` is `data/` (configurable).
 - `data/log/`: execution logs (ignored), default keep 30 days
 - `data/output/`: user-facing exported artifacts (ignored)
 
+## Docker Image
+
+Docker Hub: `nickfan/certman`
+
+GitHub Container Registry (GHCR): `ghcr.io/nickfan/certman`
+
+- `edge`: built from `master`
+- `latest` + `X.Y.Z`: built from git tags like `vX.Y.Z`
+
+Run (example):
+
+```sh
+docker run --rm \
+  -v "$(pwd)/data:/data" \
+  -e CERTMAN_DATA_DIR=/data \
+  nickfan/certman:edge --help
+```
+
 ## Quickstart (Windows)
 
 On Windows, `certbot` may require an elevated shell.
