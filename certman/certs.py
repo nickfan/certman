@@ -19,11 +19,10 @@ class CertStatus:
 def read_x509_not_after(cert_pem_path: Path) -> datetime:
     """Read notAfter from a PEM certificate file.
 
-    Uses Python's builtin ssl private API to avoid external openssl dependency.
+    Uses Python's builtin ssl private API to avoid an external openssl dependency.
     """
 
-    pem = cert_pem_path.read_text(encoding="utf-8")
-    # `_test_decode_cert` expects a filesystem path, not DER bytes.
+    # `_test_decode_cert` expects a filesystem path.
     info = ssl._ssl._test_decode_cert(str(cert_pem_path))  # type: ignore[attr-defined]
     # Example format: 'Jun 10 12:00:00 2026 GMT'
     not_after_str = info["notAfter"]

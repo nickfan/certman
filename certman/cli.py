@@ -305,7 +305,10 @@ def renew(
         typer.echo(f"log={log_path}")
         raise typer.Exit(code=1)
 
-    typer.echo("ok: renewed")
+    msg = "ok: renew completed"
+    if dry_run:
+        msg += " (dry-run)"
+    typer.echo(msg)
     typer.echo(f"log={log_path}")
 
     if export_ and not dry_run:
