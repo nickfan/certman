@@ -48,10 +48,25 @@ On Windows, `certbot` may require an elevated shell.
 
 To see certbot progress in the terminal, add `-v/--verbose`.
 
-Credentials priority (Aliyun):
-- If an entry has `credentials.access_key_id` + `credentials.access_key_secret`, certman uses them (supports `${ENV_VAR}` references).
-- Otherwise, if an entry has `account_id`, certman reads `CERTMAN_ALIYUN_<account_id>_ACCESS_KEY_ID` and `..._ACCESS_KEY_SECRET` from environment (optionally loaded via `data/conf/.env`).
-- Certbot is always invoked with an INI file under `data/run/credentials/` (runtime artifact). certman refreshes it before `new` and `renew`.
+Credentials priority (all providers):
+- If an entry has provider-specific `credentials.*` fields, certman uses them directly (supports `${ENV_VAR}` references).
+- Otherwise, if an entry has `account_id`, certman reads provider-specific environment variables from `data/conf/.env` or the process environment.
+  - Aliyun: `CERTMAN_ALIYUN_<account_id>_ACCESS_KEY_ID` and `CERTMAN_ALIYUN_<account_id>_ACCESS_KEY_SECRET`
+  - Cloudflare: `CERTMAN_CLOUDFLARE_<account_id>_API_TOKEN`
+  - Route53: `CERTMAN_AWS_<account_id>_ACCESS_KEY_ID`, `CERTMAN_AWS_<account_id>_SECRET_ACCESS_KEY`, `CERTMAN_AWS_<account_id>_REGION`
+- Certbot is always invoked with a runtime credential/config file under `data/run/credentials/`. certman refreshes it before `new` and `renew`.
+
+## DNS Providers
+
+Currently supported DNS providers:
+
+- Aliyun DNS
+- Cloudflare DNS
+- AWS Route53
+
+Installed certbot DNS plugins are managed by `uv` through [pyproject.toml](pyproject.toml).
+
+Provider-specific setup examples, `.env` naming conventions, and command examples are documented in [docs/dns-providers.md](docs/dns-providers.md).
 
 ## Cron usage (recommended)
 
