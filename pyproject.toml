@@ -7,6 +7,8 @@ requires-python = ">=3.12"
 dependencies = [
     "certbot>=5.2.2",
     "certbot-dns-aliyun>=2.0.0",
+    "certbot-dns-cloudflare>=3.2.0",
+    "certbot-dns-route53>=3.2.0",
     "pydantic>=2.12.5",
     "pydantic-settings>=2.12.0",
     "python-dotenv>=1.2.1",

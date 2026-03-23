@@ -14,6 +14,10 @@ from certman.logging_ import cleanup_logs
 from certman.providers import (
     aliyun_credentials_for_entry,
     write_aliyun_credentials_ini,
+    cloudflare_credentials_for_entry,
+    write_cloudflare_credentials_ini,
+    route53_credentials_for_entry,
+    write_route53_credentials_ini,
 )
 from certman.runtime_logging import new_run_logfile
 
@@ -42,6 +46,22 @@ def _prepare_aliyun_credentials_ini(*, runtime, entry) -> Path:
     cred_dir = runtime.paths.run_dir / "credentials"
     cred_file = cred_dir / f"aliyun_{(entry.account_id or entry.name)}.ini"
     write_aliyun_credentials_ini(cred_file, creds)
+    return cred_file
+
+
+def _prepare_cloudflare_credentials_ini(*, runtime, entry) -> Path:
+    creds = cloudflare_credentials_for_entry(entry)
+    cred_dir = runtime.paths.run_dir / "credentials"
+    cred_file = cred_dir / f"cloudflare_{(entry.account_id or entry.name)}.ini"
+    write_cloudflare_credentials_ini(cred_file, creds)
+    return cred_file
+
+
+def _prepare_route53_credentials_ini(*, runtime, entry) -> Path:
+    creds = route53_credentials_for_entry(entry)
+    cred_dir = runtime.paths.run_dir / "credentials"
+    cred_file = cred_dir / f"route53_{(entry.account_id or entry.name)}.ini"
+    write_route53_credentials_ini(cred_file, creds)
     return cred_file
 
 
@@ -138,21 +158,32 @@ def new(
     )
 
     provider = entry.dns_provider.lower()
-    if provider != "aliyun":
-        raise typer.BadParameter(
-            f"unsupported dns_provider for now: {entry.dns_provider}"
-        )
-
-    cred_file = _prepare_aliyun_credentials_ini(runtime=runtime, entry=entry)
-
     domains = _entry_domains(entry)
+
+    if provider == "aliyun":
+        cred_file = _prepare_aliyun_credentials_ini(runtime=runtime, entry=entry)
+        auth_args: list[str] = [
+            "--authenticator", "dns-aliyun",
+            "--dns-aliyun-credentials", str(cred_file),
+        ]
+    elif provider == "cloudflare":
+        cred_file = _prepare_cloudflare_credentials_ini(runtime=runtime, entry=entry)
+        auth_args = [
+            "--authenticator", "dns-cloudflare",
+            "--dns-cloudflare-credentials", str(cred_file),
+        ]
+    elif provider == "route53":
+        cred_file = _prepare_route53_credentials_ini(runtime=runtime, entry=entry)
+        auth_args = [
+            "--authenticator", "dns-route53",
+            "--dns-route53-config", str(cred_file),
+        ]
+    else:
+        raise typer.BadParameter(f"unsupported dns_provider: {entry.dns_provider}")
 
     args: list[str] = [
         "certonly",
-        "--authenticator",
-        "dns-aliyun",
-        "--dns-aliyun-credentials",
-        str(cred_file),
+        *auth_args,
         "--agree-tos",
         "--email",
         runtime.config.global_.email,
@@ -259,15 +290,26 @@ def renew(
 
     args: list[str] = ["renew"]
 
+    def _prepare_credentials(entry) -> None:
+        p = entry.dns_provider.lower()
+        if p == "aliyun":
+            _prepare_aliyun_credentials_ini(runtime=runtime, entry=entry)
+        elif p == "cloudflare":
+            _prepare_cloudflare_credentials_ini(runtime=runtime, entry=entry)
+        elif p == "route53":
+            _prepare_route53_credentials_ini(runtime=runtime, entry=entry)
+        else:
+            raise typer.BadParameter(f"unsupported dns_provider: {entry.dns_provider}")
+
     if all:
         for entry in runtime.config.entries:
-            _prepare_aliyun_credentials_ini(runtime=runtime, entry=entry)
+            _prepare_credentials(entry)
 
     if name and not all:
         targets = [e for e in runtime.config.entries if e.name == name]
         if not targets:
             raise typer.BadParameter(f"entry not found: {name}")
-        _prepare_aliyun_credentials_ini(runtime=runtime, entry=targets[0])
+        _prepare_credentials(targets[0])
         args.extend(["--cert-name", targets[0].primary_domain])
 
     if force:
