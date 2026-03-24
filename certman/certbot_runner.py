@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import os
 import subprocess
 
 
@@ -35,6 +36,7 @@ def run_certbot(
     paths: CertbotPaths,
     *,
     passthrough: bool = False,
+    env: dict[str, str | None] | None = None,
 ) -> CertbotResult:
     cmd = [
         "certbot",
@@ -49,7 +51,16 @@ def run_certbot(
     ]
 
     if not passthrough:
-        proc = subprocess.run(cmd, text=True, capture_output=True)
+        proc_env = None
+        if env:
+            proc_env = dict(os.environ)
+            for key, value in env.items():
+                if value is None:
+                    proc_env.pop(key, None)
+                    continue
+                proc_env[key] = value
+
+        proc = subprocess.run(cmd, text=True, capture_output=True, env=proc_env)
         return CertbotResult(
             cmd=cmd,
             returncode=proc.returncode,
@@ -57,5 +68,14 @@ def run_certbot(
             stderr=proc.stderr,
         )
 
-    proc = subprocess.run(cmd, text=True)
+    proc_env = None
+    if env:
+        proc_env = dict(os.environ)
+        for key, value in env.items():
+            if value is None:
+                proc_env.pop(key, None)
+                continue
+            proc_env[key] = value
+
+    proc = subprocess.run(cmd, text=True, env=proc_env)
     return CertbotResult(cmd=cmd, returncode=proc.returncode, stdout="", stderr="")

@@ -10,7 +10,7 @@ def ensure_log_dir(path: Path) -> None:
 
 def new_run_logfile(log_dir: Path, command: str) -> Path:
     ensure_log_dir(log_dir)
-    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
     safe_cmd = "".join(
         ch if ch.isalnum() or ch in {"-", "_"} else "_" for ch in command
     )

@@ -1,25 +1,16 @@
 from __future__ import annotations
 
-import json
 from datetime import datetime, timezone
+import json
 from pathlib import Path
 
 import typer
 
-from certman.certbot_runner import CertbotPaths, run_certbot
-from certman.certs import get_cert_status
 from certman.config import create_runtime
-from certman.exporter import export_entry
+from certman.exporter import EXPORT_FILES, export_entry
 from certman.logging_ import cleanup_logs
-from certman.providers import (
-    aliyun_credentials_for_entry,
-    write_aliyun_credentials_ini,
-    cloudflare_credentials_for_entry,
-    write_cloudflare_credentials_ini,
-    route53_credentials_for_entry,
-    write_route53_credentials_ini,
-)
 from certman.runtime_logging import new_run_logfile
+from certman.services.cert_service import CertService, resolve_entry_cert_name
 
 
 def _entry_domains(entry) -> list[str]:
@@ -35,34 +26,6 @@ def _entry_domains(entry) -> list[str]:
         seen.add(d)
         unique.append(d)
     return unique
-
-
-def _write_command_log(path: Path, payload: dict) -> None:
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-
-
-def _prepare_aliyun_credentials_ini(*, runtime, entry) -> Path:
-    creds = aliyun_credentials_for_entry(entry)
-    cred_dir = runtime.paths.run_dir / "credentials"
-    cred_file = cred_dir / f"aliyun_{(entry.account_id or entry.name)}.ini"
-    write_aliyun_credentials_ini(cred_file, creds)
-    return cred_file
-
-
-def _prepare_cloudflare_credentials_ini(*, runtime, entry) -> Path:
-    creds = cloudflare_credentials_for_entry(entry)
-    cred_dir = runtime.paths.run_dir / "credentials"
-    cred_file = cred_dir / f"cloudflare_{(entry.account_id or entry.name)}.ini"
-    write_cloudflare_credentials_ini(cred_file, creds)
-    return cred_file
-
-
-def _prepare_route53_credentials_ini(*, runtime, entry) -> Path:
-    creds = route53_credentials_for_entry(entry)
-    cred_dir = runtime.paths.run_dir / "credentials"
-    cred_file = cred_dir / f"route53_{(entry.account_id or entry.name)}.ini"
-    write_route53_credentials_ini(cred_file, creds)
-    return cred_file
 
 
 app = typer.Typer(add_completion=False)
@@ -88,6 +51,10 @@ def _callback(
 ):
     runtime = create_runtime(data_dir=data_dir, config_file=config_file)
     ctx.obj = runtime
+
+
+def _service(ctx: typer.Context) -> CertService:
+    return CertService(ctx.obj)
 
 
 @app.command("config-validate")
@@ -144,105 +111,27 @@ def new(
     ),
 ):
     """Issue (new) certificate for an entry."""
-    runtime = ctx.obj
-    targets = [e for e in runtime.config.entries if e.name == name]
-    if not targets:
-        raise typer.BadParameter(f"entry not found: {name}")
-    entry = targets[0]
+    try:
+        result = _service(ctx).issue(name, force=force, verbose=verbose)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
 
-    letsencrypt_dir = runtime.paths.run_dir / runtime.config.global_.letsencrypt_dir
-    paths = CertbotPaths(
-        config_dir=letsencrypt_dir,
-        work_dir=runtime.paths.run_dir / "work",
-        logs_dir=runtime.paths.log_dir,
-    )
-
-    provider = entry.dns_provider.lower()
-    domains = _entry_domains(entry)
-
-    if provider == "aliyun":
-        cred_file = _prepare_aliyun_credentials_ini(runtime=runtime, entry=entry)
-        auth_args: list[str] = [
-            "--authenticator", "dns-aliyun",
-            "--dns-aliyun-credentials", str(cred_file),
-        ]
-    elif provider == "cloudflare":
-        cred_file = _prepare_cloudflare_credentials_ini(runtime=runtime, entry=entry)
-        auth_args = [
-            "--authenticator", "dns-cloudflare",
-            "--dns-cloudflare-credentials", str(cred_file),
-        ]
-    elif provider == "route53":
-        cred_file = _prepare_route53_credentials_ini(runtime=runtime, entry=entry)
-        auth_args = [
-            "--authenticator", "dns-route53",
-            "--dns-route53-config", str(cred_file),
-        ]
-    else:
-        raise typer.BadParameter(f"unsupported dns_provider: {entry.dns_provider}")
-
-    args: list[str] = [
-        "certonly",
-        *auth_args,
-        "--agree-tos",
-        "--email",
-        runtime.config.global_.email,
-    ]
-
-    if runtime.config.global_.acme_server == "staging":
-        args.append("--test-cert")
-
-    if force:
-        args.append("--force-renewal")
-
-    for d in domains:
-        args.extend(["-d", d])
-
-    log_path = new_run_logfile(runtime.paths.log_dir, command="new")
-    result = run_certbot(args, paths=paths, passthrough=verbose)
-    payload = {
-        "ts": datetime.now(timezone.utc).isoformat(),
-        "command": "new",
-        "entry": entry.name,
-        "domains": domains,
-        "provider": provider,
-        "certbot": {
-            "returncode": result.returncode,
-            "cmd": result.cmd,
-            "stdout": result.stdout,
-            "stderr": result.stderr,
-        },
-    }
-
-    if not result.ok and result.is_admin_required_error():
-        payload["hint"] = {
-            "reason": "windows_admin_required",
-            "suggestions": [
-                "Re-run in elevated (Administrator) shell",
-                "Or use gsudo to elevate: gsudo <same command>",
-                "Or switch to WSL runner (recommended on Windows)",
-                "Or switch to docker-compose runner and mount /data",
-            ],
-        }
-
-    _write_command_log(log_path, payload)
-
-    if not result.ok:
-        if result.is_admin_required_error():
+    if not result.success:
+        if result.admin_required:
             typer.echo("certbot requires Windows administrative rights.")
             typer.echo(
                 "Next steps: run in Administrator shell; or use gsudo; "
                 "or switch to WSL; or switch to docker-compose."
             )
-            typer.echo(f"log={log_path}")
+            typer.echo(f"log={result.log_path}")
             raise typer.Exit(code=2)
 
-        typer.echo("certbot failed")
-        typer.echo(f"log={log_path}")
+        typer.echo(result.error or "certbot failed")
+        typer.echo(f"log={result.log_path}")
         raise typer.Exit(code=1)
 
-    typer.echo(f"ok: issued entry={entry.name} domains={','.join(domains)}")
-    typer.echo(f"log={log_path}")
+    typer.echo(f"ok: issued entry={result.entry_name} domains={','.join(result.domains)}")
+    typer.echo(f"log={result.log_path}")
 
     if export_:
         export(ctx, all=False, name=name, overwrite=True)
@@ -277,87 +166,56 @@ def renew(
 
     Certbot will reuse the authenticator/options stored in each renewal config.
     """
-    runtime = ctx.obj
-    if not all and not name:
-        raise typer.BadParameter("must provide --all or --name")
+    try:
+        results = _service(ctx).renew(
+            all=all,
+            name=name,
+            force=force,
+            dry_run=dry_run,
+            verbose=verbose,
+        )
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
 
-    letsencrypt_dir = runtime.paths.run_dir / runtime.config.global_.letsencrypt_dir
-    paths = CertbotPaths(
-        config_dir=letsencrypt_dir,
-        work_dir=runtime.paths.run_dir / "work",
-        logs_dir=runtime.paths.log_dir,
-    )
+    if not results:
+        raise typer.BadParameter("no entries configured")
 
-    args: list[str] = ["renew"]
+    successes = [result for result in results if result.success]
+    failures = [result for result in results if not result.success]
+    admin_failures = [result for result in failures if result.admin_required]
 
-    def _prepare_credentials(entry) -> None:
-        p = entry.dns_provider.lower()
-        if p == "aliyun":
-            _prepare_aliyun_credentials_ini(runtime=runtime, entry=entry)
-        elif p == "cloudflare":
-            _prepare_cloudflare_credentials_ini(runtime=runtime, entry=entry)
-        elif p == "route53":
-            _prepare_route53_credentials_ini(runtime=runtime, entry=entry)
-        else:
-            raise typer.BadParameter(f"unsupported dns_provider: {entry.dns_provider}")
+    for result in successes:
+        msg = f"ok: renewed entry={result.entry_name}"
+        if result.dry_run:
+            msg += " (dry-run)"
+        typer.echo(msg)
+        typer.echo(f"log={result.log_path}")
 
-    if all:
-        for entry in runtime.config.entries:
-            _prepare_credentials(entry)
-
-    if name and not all:
-        targets = [e for e in runtime.config.entries if e.name == name]
-        if not targets:
-            raise typer.BadParameter(f"entry not found: {name}")
-        _prepare_credentials(targets[0])
-        args.extend(["--cert-name", targets[0].primary_domain])
-
-    if force:
-        args.append("--force-renewal")
-
-    if dry_run:
-        args.append("--dry-run")
-
-    log_path = new_run_logfile(runtime.paths.log_dir, command="renew")
-    result = run_certbot(args, paths=paths, passthrough=verbose)
-    payload = {
-        "ts": datetime.now(timezone.utc).isoformat(),
-        "command": "renew",
-        "args": args,
-        "certbot": {
-            "returncode": result.returncode,
-            "cmd": result.cmd,
-            "stdout": result.stdout,
-            "stderr": result.stderr,
-        },
-    }
-    _write_command_log(log_path, payload)
-
-    if not result.ok:
-        if result.is_admin_required_error():
+    for result in failures:
+        if result.admin_required:
             typer.echo("certbot requires Windows administrative rights.")
             typer.echo(
                 "Next steps: run in Administrator shell; or use gsudo; "
                 "or switch to WSL; or switch to docker-compose."
             )
-            typer.echo(f"log={log_path}")
-            raise typer.Exit(code=2)
+        else:
+            typer.echo(result.error or "certbot renew failed")
+        typer.echo(f"entry={result.entry_name} log={result.log_path}")
 
-        typer.echo("certbot renew failed")
-        typer.echo(f"log={log_path}")
-        raise typer.Exit(code=1)
+    if export_ and not dry_run and not failures:
+        for result in successes:
+            export(ctx, all=False, name=result.entry_name, overwrite=True)
 
-    msg = "ok: renew completed"
+    if failures:
+        raise typer.Exit(code=2 if admin_failures else 1)
+
+    if all:
+        msg = f"ok: renew completed count={len(successes)}"
+    else:
+        msg = "ok: renew completed"
     if dry_run:
         msg += " (dry-run)"
     typer.echo(msg)
-    typer.echo(f"log={log_path}")
-
-    if export_ and not dry_run:
-        if name and not all:
-            export(ctx, all=False, name=name, overwrite=True)
-        else:
-            export(ctx, all=True, name=None, overwrite=True)
 
 
 @app.command("export")
@@ -384,9 +242,23 @@ def export(
 
     copied_total = 0
     copied_paths: list[Path] = []
+    failed_entries: list[str] = []
     for entry in targets:
-        live_dir = letsencrypt_dir / "live" / entry.primary_domain
+        try:
+            cert_name = resolve_entry_cert_name(runtime, entry, require_existing_lineage=True)
+        except ValueError as exc:
+            failed_entries.append(f"entry={entry.name} error={exc}")
+            continue
+
+        live_dir = letsencrypt_dir / "live" / cert_name
         out_dir = runtime.paths.output_dir / entry.name
+        missing_source_files = [name for name in EXPORT_FILES if not (live_dir / name).exists()]
+        if missing_source_files:
+            failed_entries.append(
+                f"entry={entry.name} missing_source_files={','.join(missing_source_files)}"
+            )
+            continue
+
         copied = export_entry(
             letsencrypt_live_dir=live_dir,
             output_entry_dir=out_dir,
@@ -394,6 +266,20 @@ def export(
         )
         copied_total += len(copied)
         copied_paths.extend(copied)
+        if not copied:
+            failed_entries.append(f"entry={entry.name} no files exported")
+
+    if copied_total == 0:
+        for entry_name in failed_entries:
+            typer.echo(entry_name)
+        typer.echo("No certificate files were exported")
+        raise typer.Exit(code=1)
+
+    if failed_entries:
+        typer.echo(f"Exported {copied_total} file(s)")
+        for entry_name in failed_entries:
+            typer.echo(entry_name)
+        raise typer.Exit(code=1)
 
     typer.echo(f"Exported {copied_total} file(s)")
     if copied_paths:
@@ -431,61 +317,27 @@ def check(
 
     runtime = ctx.obj
 
-    targets = runtime.config.entries
-    if name:
-        targets = [e for e in targets if e.name == name]
-        if not targets:
-            raise typer.BadParameter(f"entry not found: {name}")
+    results = _service(ctx).check(
+        warn_days=warn_days,
+        force_renew_days=force_renew_days,
+        name=name,
+    )
 
-    letsencrypt_dir = runtime.paths.run_dir / runtime.config.global_.letsencrypt_dir
-
-    results: list[dict] = []
     worst_code = 0
-
-    for entry in targets:
-        cert_path = letsencrypt_dir / "live" / entry.primary_domain / "cert.pem"
-        if not cert_path.exists():
-            results.append(
-                {
-                    "entry": entry.name,
-                    "primary_domain": entry.primary_domain,
-                    "status": "missing",
-                    "cert_path": str(cert_path),
-                }
-            )
+    for result in results:
+        if result["status"] == "missing":
             worst_code = max(worst_code, 30)
-            continue
-
-        status = get_cert_status(cert_path)
-        days_left = status.days_left
-
-        state = "ok"
-        code = 0
-        if days_left <= force_renew_days:
-            state = "force-renew"
-            code = 20
-        elif days_left <= warn_days:
-            state = "warn"
-            code = 10
-
-        results.append(
-            {
-                "entry": entry.name,
-                "primary_domain": entry.primary_domain,
-                "status": state,
-                "days_left": days_left,
-                "not_after": status.not_after.isoformat(),
-                "cert_path": str(cert_path),
-            }
-        )
-        worst_code = max(worst_code, code)
+        elif result["status"] == "force-renew":
+            worst_code = max(worst_code, 20)
+        elif result["status"] == "warn":
+            worst_code = max(worst_code, 10)
 
     log_path = new_run_logfile(runtime.paths.log_dir, command="check")
     fix_actions: list[dict] = []
 
     if fix:
         for r in results:
-            if r["status"] == "missing":
+            if r["status"] == "missing" and r.get("reason") in {None, "cert-missing"}:
                 fix_actions.append(
                     {
                         "entry": r["entry"],
@@ -529,9 +381,14 @@ def check(
     else:
         for r in results:
             if r["status"] == "missing":
-                typer.echo(
-                    f"[{r['status']}] {r['entry']} {r['primary_domain']} cert={r['cert_path']}"
-                )
+                message = f"[{r['status']}] {r['entry']} {r.get('primary_domain') or '-'}"
+                if r.get("reason"):
+                    message += f" reason={r['reason']}"
+                if r.get("error"):
+                    message += f" error={r['error']}"
+                if r.get("cert_path"):
+                    message += f" cert={r['cert_path']}"
+                typer.echo(message)
             else:
                 typer.echo(
                     f"[{r['status']}] {r['entry']} {r['primary_domain']} days_left={r['days_left']} not_after={r['not_after']}"

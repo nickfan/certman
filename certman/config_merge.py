@@ -51,8 +51,16 @@ def load_merged_config(global_config_path: Path) -> AppConfig:
             merged_entries.append(item_entry)
 
     merged_dict = {
+        "run_mode": base_cfg.run_mode,
         "global": base_cfg.global_.model_dump(),
         "entries": merged_entries,
+        "control_plane": (
+            base_cfg.control_plane.model_dump() if base_cfg.control_plane else None
+        ),
+        "node_identity": (
+            base_cfg.node_identity.model_dump() if base_cfg.node_identity else None
+        ),
+        "hooks": [hook.model_dump() for hook in base_cfg.hooks],
     }
 
     return AppConfig.model_validate(merged_dict)

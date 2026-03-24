@@ -39,6 +39,46 @@ docker run --rm \
   nickfan/certman:edge --help
 ```
 
+Common command examples:
+
+```bash
+docker run --rm \
+  -v "$(pwd)/data:/data" \
+  -e CERTMAN_DATA_DIR=/data \
+  nickfan/certman:edge check --warn-days 30 --force-renew-days 7
+```
+
+```powershell
+docker run --rm `
+  -v "${PWD}/data:/data" `
+  -e CERTMAN_DATA_DIR=/data `
+  nickfan/certman:edge check --warn-days 30 --force-renew-days 7
+```
+
+## Script wrappers (Windows/Linux)
+
+To avoid repeatedly typing mount/env/image options, use wrapper scripts and keep certman subcommand arguments outside.
+
+- Linux/macOS (bash): `scripts/certman-docker.sh`
+- Windows (PowerShell): `scripts/certman-docker.ps1`
+
+Examples (arguments stay external):
+
+```bash
+bash scripts/certman-docker.sh check --warn-days 30 --force-renew-days 7
+bash scripts/certman-docker.sh renew --all
+```
+
+```powershell
+.\scripts\certman-docker.ps1 check --warn-days 30 --force-renew-days 7
+.\scripts\certman-docker.ps1 renew --all
+```
+
+Optional environment overrides for wrapper scripts:
+
+- `CERTMAN_IMAGE`: override image tag (default: `nickfan/certman:edge`)
+- `CERTMAN_DATA_DIR_HOST`: override host data dir mounted to `/data` (default: `<project>/data`)
+
 ## Quickstart (Windows)
 
 On Windows, `certbot` may require an elevated shell.

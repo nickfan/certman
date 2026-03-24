@@ -4,7 +4,7 @@ from pathlib import Path
 import shutil
 
 
-_EXPORT_FILES = [
+EXPORT_FILES = [
     "cert.pem",
     "chain.pem",
     "fullchain.pem",
@@ -23,13 +23,14 @@ def export_entry(
     output_entry_dir.mkdir(parents=True, exist_ok=True)
 
     copied: list[Path] = []
-    for name in _EXPORT_FILES:
+    for name in EXPORT_FILES:
         src = letsencrypt_live_dir / name
         if not src.exists():
             continue
 
         dst = output_entry_dir / name
         if dst.exists() and not overwrite:
+            copied.append(dst)
             continue
 
         shutil.copy2(src, dst)

@@ -23,11 +23,12 @@ certman = "certman.cli:main"
 [tool.uv]
 package = true
 
-[tool.setuptools]
-packages = ["certman"]
+[tool.setuptools.packages.find]
+include = ["certman*"]
 
 [tool.pytest.ini_options]
 addopts = "-q"
+testpaths = ["tests"]
 
 [[tool.uv.index]]
 url = "https://pypi.tuna.tsinghua.edu.cn/simple"

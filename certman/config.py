@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 import os
 
@@ -12,7 +13,7 @@ import tomllib
 _toml_loads = tomllib.loads
 
 from dotenv import load_dotenv
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 # imported lazily in create_runtime to avoid cycles
 
@@ -29,6 +30,25 @@ class GlobalConfig(BaseModel):
     email: str = "admin@example.com"
 
 
+class ControlPlaneConfig(BaseModel):
+    endpoint: str
+    poll_interval_seconds: int = 30
+
+
+class NodeIdentityConfig(BaseModel):
+    node_id: str
+    private_key_path: str
+    public_key_path: str | None = None
+    certificate_store_path: str | None = None
+
+
+class HookConfig(BaseModel):
+    name: str
+    event: str
+    command: str
+    shell: bool = True
+
+
 class CredentialsConfig(BaseModel):
     # Optional raw creds (portable mode)
     access_key_id: str | None = None
@@ -40,6 +60,7 @@ class EntryConfig(BaseModel):
     name: str
     description: str = ""
     primary_domain: str
+    cert_name: str | None = None
     secondary_domains: list[str] = Field(default_factory=list)
     wildcard: bool = True
 
@@ -53,8 +74,21 @@ class EntryConfig(BaseModel):
 
 
 class AppConfig(BaseModel):
+    run_mode: Literal["local", "agent", "server"] = "local"
     global_: GlobalConfig = Field(alias="global")
     entries: list[EntryConfig] = Field(default_factory=list)
+    control_plane: ControlPlaneConfig | None = None
+    node_identity: NodeIdentityConfig | None = None
+    hooks: list[HookConfig] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _validate_run_mode(self):
+        if self.run_mode == "agent":
+            if self.control_plane is None or not self.control_plane.endpoint:
+                raise ValueError("agent mode requires control_plane.endpoint")
+            if self.node_identity is None or not self.node_identity.private_key_path:
+                raise ValueError("agent mode requires node_identity.private_key_path")
+        return self
 
     def validate_required_secrets(self, env: dict[str, str]) -> None:
         missing: list[str] = []
@@ -67,8 +101,12 @@ class AppConfig(BaseModel):
 
 
 class GlobalOnlyConfig(BaseModel):
+    run_mode: Literal["local", "agent", "server"] = "local"
     global_: GlobalConfig = Field(alias="global")
     scan_items_glob: str = "item_*.toml"
+    control_plane: ControlPlaneConfig | None = None
+    node_identity: NodeIdentityConfig | None = None
+    hooks: list[HookConfig] = Field(default_factory=list)
 
 
 def _is_env_ref(value: str) -> bool:
@@ -179,12 +217,20 @@ def create_runtime(data_dir: str, config_file: str | None) -> Runtime:
     config = load_merged_config(cfg_path)
 
     # allow overriding data_dir in config (mostly for docker /data)
-    if config.global_.data_dir and config.global_.data_dir != data_dir:
-        base = Path(config.global_.data_dir)
-        conf_dir = base / config.global_.conf_dir
-        run_dir = base / config.global_.run_dir
-        log_dir = base / config.global_.log_dir
-        output_dir = base / config.global_.output_dir
+    if config.global_.data_dir:
+        configured_base = Path(config.global_.data_dir)
+        if configured_base.is_absolute() and configured_base != base:
+            base = configured_base
+            conf_dir = base / config.global_.conf_dir
+            run_dir = base / config.global_.run_dir
+            log_dir = base / config.global_.log_dir
+            output_dir = base / config.global_.output_dir
+        elif not configured_base.is_absolute() and configured_base != Path("data"):
+            base = base.parent / configured_base
+            conf_dir = base / config.global_.conf_dir
+            run_dir = base / config.global_.run_dir
+            log_dir = base / config.global_.log_dir
+            output_dir = base / config.global_.output_dir
 
     paths = Paths(
         data_dir=base,
