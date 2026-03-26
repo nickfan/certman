@@ -50,10 +50,10 @@ Expected: PASS
 ### Task 2: 定义统一领域模型
 
 **Files:**
-- Create: certman/models/__init__.py
-- Create: certman/models/certificate.py
-- Create: certman/models/job.py
-- Create: certman/models/node.py
+- Modify: certman/models/__init__.py
+- Modify: certman/models/certificate.py
+- Modify: certman/models/job.py
+- Modify: certman/models/node.py
 - Test: tests/test_models.py
 
 **Step 1: Write the failing test**
@@ -75,13 +75,41 @@ Run: pytest tests/test_models.py -q
 Expected: PASS
 
 ---
+### Task 2.5: 引入 Alembic 与 initial migration
 
+**Files:**
+- Create: certman/db/__init__.py
+- Create: certman/db/engine.py
+- Create: alembic.ini
+- Create: alembic/env.py
+- Create: alembic/versions/001_initial.py
+- Test: tests/test_db.py
+
+**Step 1: Write the failing test**
+
+验证 migration upgrade 后表结构存在，downgrade 后表被移除。
+
+**Step 2: Run test to verify it fails**
+
+Run: pytest tests/test_db.py -q
+Expected: FAIL
+
+**Step 3: Write minimal implementation**
+
+创建 SQLAlchemy engine helper + Alembic 配置 + initial migration（仅包含 CERTIFICATE/JOB/NODE/AUDIT_EVENT 核心表；WEBHOOK_SUBSCRIPTION/WEBHOOK_DELIVERY 通过 Phase 5 增量 migration 引入）。同时在依赖更新任务中显式加入 `alembic`，并在依赖变更后刷新锁文件；未更新锁文件不得进入容器构建与 CI 验证。
+
+**Step 4: Run test to verify it passes**
+
+Run: pytest tests/test_db.py -q
+Expected: PASS
+
+---
 ## Phase 1: 抽取 CLI 核心服务层
 
 ### Task 3: 抽取证书生命周期服务
 
 **Files:**
-- Create: certman/services/cert_service.py
+- Modify: certman/services/cert_service.py
 - Modify: certman/cli.py
 - Test: tests/test_cert_service.py
 
@@ -148,7 +176,7 @@ Expected: PASS
 - Create: certman/node_agent/__init__.py
 - Create: certman/node_agent/agent.py
 - Create: certman/node_agent/poller.py
-- Modify: pyproject.toml
+- Modify: pyproject.toml  → 新增 `certman-agent = "certman.node_agent.agent:main"`
 - Test: tests/test_agent_mode.py
 
 **Step 1: Write the failing test**
@@ -210,7 +238,8 @@ Expected: PASS
 - Create: certman/api/routes/health.py
 - Create: certman/api/routes/certificates.py
 - Create: certman/server.py
-- Modify: pyproject.toml
+- Create: certman/worker.py  ← stub，为 Compose worker 服务提供入口
+- Modify: pyproject.toml  → 新增 `certman-server = "certman.server:main"` 与 `certman-worker = "certman.worker:main"`
 - Test: tests/test_api_health.py
 
 **Step 1: Write the failing test**
@@ -249,7 +278,7 @@ Expected: FAIL
 
 **Step 3: Write minimal implementation**
 
-先用内存 job store 实现最小闭环。
+基于 SQLite + SQLAlchemy 实现 job 持久化与状态查询。
 
 **Step 4: Run test to verify it passes**
 

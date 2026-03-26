@@ -13,6 +13,28 @@
 | M3 | Phase 4-5 | 安全链路 + 调度 + webhook 完成 |
 | M4 | Phase 6 | 文档部署与验收完成 |
 
+## 1.5 当前仓库基线
+
+| 组件 | 文件 | 状态 | 说明 |
+|---|---|---|---|
+| 运行模式配置 | `certman/config.py` | ✅ 已实现 | `run_mode` / `control_plane` / `node_identity` / `hooks` 配置结构已就位 |
+| Pydantic 领域模型 | `certman/models/*.py` | ✅ 已实现 | `CertificateRecord` / `JobRecord` / `NodeIdentityRecord` 已定义 |
+| 核心服务 | `certman/services/cert_service.py` | ✅ 已实现 | `issue()` / `renew()` / `check()` 编排已完成 |
+| CLI 入口 | `certman/cli.py` | ✅ 已实现 | Typer 命令已注册 |
+| 导出 | `certman/exporter.py` | ⚠️ 已实现但未服务化 | 函数式实现，未抜取为服务 |
+| pyproject.toml | `pyproject.toml` | ⚠️ 仅注册 `certman` | 缺少 `certman-agent` / `certman-server` / `certman-worker` 入口；缺少 fastapi/httpx/cryptography/sqlalchemy 依赖 |
+| Dockerfile | `Dockerfile` | ⚠️ 单入口 | 仅 `ENTRYPOINT ["uv", "run", "certman"]` |
+| docker-compose.yml | `docker-compose.yml` | ⚠️ 单服务 | 仅 `certman` 服务 |
+| DB 层 | — | ❌ 未开始 | SQLite + SQLAlchemy + Alembic 均未引入 |
+| Agent / Server / Worker | — | ❌ 未开始 | |
+| Security 模块 | — | ❌ 未开始 | |
+| 配置示例 | `data/conf/config.example.toml` | ⚠️ 不完整 | 缺少 `run_mode` / `control_plane` / `node_identity` / `hooks` 示例段 |
+
+### 已知技术债
+
+1. `_entry_domains()` 函数在 `certman/cli.py` L16 与 `certman/services/cert_service.py` L49 重复实现（DRY 违反）。
+2. `_validate_run_mode()` 仅校验 `agent` 模式，未校验 `server` 模式。
+
 ## 2. Phase 看板
 
 | Phase | 工作包 | 状态 | 负责人 | 预计 |
@@ -50,12 +72,18 @@ graph LR
 - [ ] 0.3 引入 `CheckResult` 类型化返回
 - [ ] 0.4 增加 FastAPI/httpx/cryptography/SQLAlchemy 依赖
 - [ ] 0.5 创建 `certman/db/*` 与 `tests/test_db.py`
+- [ ] 0.6 更新 `config.example.toml`，增加 `run_mode` / `control_plane` / `node_identity` / `hooks` 最小配置示例段
 
 验证命令：
 
 ```bash
 pytest tests/test_models.py tests/test_config_modes.py tests/test_cert_service.py tests/test_cli_commands.py -q
 ```
+
+**Phase 0 DoD:**
+
+- 通用: ✅ 验证命令通过 · ✅ 新增测试全绻 · ✅ 覆盖率 >= 80% · ✅ 无 Critical lint issue
+- 专项: ① Alembic `initial` migration 可正常 upgrade/downgrade ② `_validate_run_mode` 覆盖 server 模式校验 ③ `config.example.toml` 包含 agent/server 最小配置示例
 
 ### Phase 1
 
@@ -68,6 +96,11 @@ pytest tests/test_models.py tests/test_config_modes.py tests/test_cert_service.p
 ```bash
 pytest tests/test_export_service.py tests/test_hook_runner.py -q
 ```
+
+**Phase 1 DoD:**
+
+- 通用: ✅ 验证命令通过 · ✅ 新增测试全绻 · ✅ 覆盖率 >= 80% · ✅ 无 Critical lint issue
+- 专项: ① `export_entry()` 通过 `ExportService` 调用而非直接函数引用 ② HookRunner 执行失败时错误可被上层捕获
 
 ### Phase 2
 
@@ -84,6 +117,11 @@ pytest tests/test_agent_mode.py tests/test_node_executor.py -q
 uv run certman-agent --help
 ```
 
+**Phase 2 DoD:**
+
+- 通用: ✅ 验证命令通过 · ✅ 新增测试全绻 · ✅ 覆盖率 >= 80% · ✅ 无 Critical lint issue
+- 专项: ① `uv run certman-agent --help` 可正常输出 ② Agent 空轮询 → 退出闭环可测 ③ Dockerfile 支持 CMD 覆盖
+
 ### Phase 3
 
 - [ ] 3.1 创建 `certman/api/app.py` + health route
@@ -99,6 +137,11 @@ pytest tests/test_api_health.py tests/test_job_service.py -q
 uv run certman-server --help
 ```
 
+**Phase 3 DoD:**
+
+- 通用: ✅ 验证命令通过 · ✅ 新增测试全绻 · ✅ 覆盖率 >= 80% · ✅ 无 Critical lint issue
+- 专项: ① `uv run certman-server --help` 可正常输出 ② `GET /health` 返回 200 ③ `POST /api/v1/certificates` 返回 202 + job_id ④ 最小 Compose 骨架（server + worker）可 up
+
 ### Phase 4
 
 - [ ] 4.1 创建 `security/identity.py`
@@ -112,6 +155,11 @@ uv run certman-server --help
 pytest tests/test_signing.py tests/test_envelope.py -q
 ```
 
+**Phase 4 DoD:**
+
+- 通用: ✅ 验证命令通过 · ✅ 新增测试全绻 · ✅ 覆盖率 >= 80% · ✅ 无 Critical lint issue
+- 专项: ① 签名验签成功/失败分支可测 ② 加密解密 + 错误密钥分支可测 ③ 节点注册握手闭环可测
+
 ### Phase 5
 
 - [ ] 5.1 创建 `scheduler/jobs.py`
@@ -124,6 +172,11 @@ pytest tests/test_signing.py tests/test_envelope.py -q
 ```bash
 pytest tests/test_scheduler_jobs.py tests/test_webhook_service.py -q
 ```
+
+**Phase 5 DoD:**
+
+- 通用: ✅ 验证命令通过 · ✅ 新增测试全绻 · ✅ 覆盖率 >= 80% · ✅ 无 Critical lint issue
+- 专项: ① 到期扫描 → 自动生成续签任务可测 ② Webhook 签名 + 重试 + 投递记录可测
 
 ### Phase 6
 
@@ -141,6 +194,11 @@ uv run certman-server --help
 pytest --tb=short
 pytest --cov=certman --cov-report=term-missing
 ```
+
+**Phase 6 DoD:**
+
+- 通用: ✅ 验证命令通过 · ✅ 新增测试全绻 · ✅ 覆盖率 >= 80% · ✅ 无 Critical lint issue
+- 专项: ① 三入口 `--help` 均正常 ② 全量回归通过 ③ 覆盖率总计 >= 80% ④ README 运行示例可执行
 
 ## 5. 风险清单
 
