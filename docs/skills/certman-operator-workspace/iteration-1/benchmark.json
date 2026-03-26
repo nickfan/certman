@@ -1,0 +1,47 @@
+{
+  "skill_name": "certman-operator",
+  "iteration": 1,
+  "summary": {
+    "with_skill": {
+      "passed_assertions": 9,
+      "total_assertions": 9,
+      "pass_rate": 1.0,
+      "avg_tokens": null,
+      "avg_duration_seconds": null
+    },
+    "without_skill": {
+      "passed_assertions": 2,
+      "total_assertions": 9,
+      "pass_rate": 0.2222,
+      "avg_tokens": null,
+      "avg_duration_seconds": null
+    },
+    "delta": {
+      "pass_rate": 0.7778,
+      "tokens": null,
+      "duration_seconds": null
+    }
+  },
+  "per_eval": [
+    {
+      "eval_id": 1,
+      "with_skill": {"passed_assertions": 3, "total_assertions": 3, "pass_rate": 1.0},
+      "without_skill": {"passed_assertions": 0, "total_assertions": 3, "pass_rate": 0.0}
+    },
+    {
+      "eval_id": 2,
+      "with_skill": {"passed_assertions": 3, "total_assertions": 3, "pass_rate": 1.0},
+      "without_skill": {"passed_assertions": 1, "total_assertions": 3, "pass_rate": 0.3333}
+    },
+    {
+      "eval_id": 3,
+      "with_skill": {"passed_assertions": 3, "total_assertions": 3, "pass_rate": 1.0},
+      "without_skill": {"passed_assertions": 1, "total_assertions": 3, "pass_rate": 0.3333}
+    }
+  ],
+  "notes": [
+    "本轮使用 runSubagent 采样，未采集到稳定 token/duration 计量。",
+    "passed/total 统计口径为断言数，不是重复运行次数。",
+    "主要增益来自执行面选择稳定性、错误分类一致性和退出码语义完整性。"
+  ]
+}

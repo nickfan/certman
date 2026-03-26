@@ -1,0 +1,10 @@
+{
+  "eval_id": 1,
+  "eval_name": "cert-create-and-job-wait",
+  "prompt": "控制面在 http://127.0.0.1:8000，帮我给 site-a 发证并等待任务完成，结果请结构化输出并给出失败分类。",
+  "assertions": [
+    "使用 certmanctl 并包含 cert create + job wait 两步命令",
+    "输出包含 surface/action/inputs/result/next_steps",
+    "错误类型使用 TransportError|ApiError|TimeoutError|ValidationError|null"
+  ]
+}

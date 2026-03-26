@@ -1,0 +1,20 @@
+{
+  "run_id": "eval-3-with_skill",
+  "expectations": [
+    {
+      "text": "使用 certman check --json 语义",
+      "passed": true,
+      "evidence": "commands 使用 uv run certman -D data check --json"
+    },
+    {
+      "text": "明确解释 0/10/20/30 退出码",
+      "passed": true,
+      "evidence": "exit_code_semantics 包含四个值"
+    },
+    {
+      "text": "给出基于退出码的下一步动作",
+      "passed": true,
+      "evidence": "next_steps 明确 renew/rebuild 分支"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "evaluation_id": 3,
+  "task_type": "baseline",
+  "command": "uv run certman check --config data/conf/config.toml --output-format json",
+  "exit_code_interpretation": {
+    "0": "all good",
+    "1": "need renew soon",
+    "2": "need renew now"
+  },
+  "renewal_decision": "if exit != 0 then renew"
+}

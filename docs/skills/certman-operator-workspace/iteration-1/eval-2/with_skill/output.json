@@ -1,0 +1,26 @@
+{
+  "eval_id": 2,
+  "surface": "certmanctl",
+  "action": "更新 webhook 状态并确认",
+  "inputs": {
+    "endpoint": "http://127.0.0.1:8000",
+    "webhook_id": "abc123",
+    "target_status": "inactive"
+  },
+  "commands": [
+    "uv run certmanctl --endpoint http://127.0.0.1:8000 webhook update --id abc123 --status inactive",
+    "uv run certmanctl --endpoint http://127.0.0.1:8000 webhook get --id abc123"
+  ],
+  "result": {
+    "status": "failed",
+    "data": null,
+    "error": {
+      "type": "ApiError",
+      "message": "HTTP 404",
+      "raw": "webhook not found"
+    }
+  },
+  "next_steps": [
+    "先 webhook list 确认 ID 是否存在"
+  ]
+}

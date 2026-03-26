@@ -1,0 +1,20 @@
+{
+  "run_id": "eval-1-without_skill",
+  "expectations": [
+    {
+      "text": "使用 certmanctl 并包含 cert create + job wait 两步命令",
+      "passed": false,
+      "evidence": "使用了泛化 certman-api 流程，缺少明确 certmanctl 两步命令"
+    },
+    {
+      "text": "输出包含 surface/action/inputs/result/next_steps",
+      "passed": false,
+      "evidence": "缺少 result.error.type 与稳定字段约束"
+    },
+    {
+      "text": "错误类型使用统一枚举",
+      "passed": false,
+      "evidence": "failure_classification 为 INFRASTRUCTURE_ERROR，非约定枚举"
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "surface": "certmanctl",
+  "action": "为 site-a 签发证书并等待任务完成",
+  "inputs": {
+    "endpoint": "http://127.0.0.1:8000",
+    "entry_name": "site-a"
+  },
+  "result": {
+    "status": "failed",
+    "data": null,
+    "error": {
+      "type": "TransportError",
+      "message": "Preflight failed: 控制面健康检查失败",
+      "raw": "uv run certmanctl --endpoint http://127.0.0.1:8000 health -> exit 1"
+    }
+  },
+  "commands": [
+    "uv run certmanctl --endpoint http://127.0.0.1:8000 health",
+    "uv run certmanctl --endpoint http://127.0.0.1:8000 cert create --entry-name site-a",
+    "uv run certmanctl --endpoint http://127.0.0.1:8000 job wait --job-id <JOB_ID>"
+  ],
+  "next_steps": [
+    "恢复控制面可达后按顺序执行 create/wait"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "eval_id": 2,
+  "eval_name": "webhook-update-and-verify",
+  "prompt": "把 webhook id=abc123 改成 inactive，然后确认状态，endpoint 是 http://127.0.0.1:8000。",
+  "assertions": [
+    "使用 webhook update 后接 webhook get",
+    "正确传递 id=abc123 与 status=inactive",
+    "输出包含错误分类并可用于自动化后续处理"
+  ]
+}

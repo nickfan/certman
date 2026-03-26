@@ -1,0 +1,20 @@
+{
+  "run_id": "eval-2-without_skill",
+  "expectations": [
+    {
+      "text": "使用 webhook update 后接 webhook get",
+      "passed": false,
+      "evidence": "使用 curl PATCH/GET，未遵循 certmanctl 命令面"
+    },
+    {
+      "text": "正确传递 id=abc123 与 status=inactive",
+      "passed": true,
+      "evidence": "路径和 payload 覆盖该意图"
+    },
+    {
+      "text": "输出包含错误分类并可用于自动化后续处理",
+      "passed": false,
+      "evidence": "error_classification=null 且 execution_status=not_executed"
+    }
+  ]
+}

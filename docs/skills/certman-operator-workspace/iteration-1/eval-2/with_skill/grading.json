@@ -1,0 +1,20 @@
+{
+  "run_id": "eval-2-with_skill",
+  "expectations": [
+    {
+      "text": "使用 webhook update 后接 webhook get",
+      "passed": true,
+      "evidence": "commands 字段包含 update/get 顺序"
+    },
+    {
+      "text": "正确传递 id=abc123 与 status=inactive",
+      "passed": true,
+      "evidence": "命令参数包含 --id abc123 --status inactive"
+    },
+    {
+      "text": "输出包含错误分类并可用于自动化后续处理",
+      "passed": true,
+      "evidence": "result.error.type=ApiError 且含 next_steps"
+    }
+  ]
+}

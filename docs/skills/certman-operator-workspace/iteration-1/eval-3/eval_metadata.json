@@ -1,0 +1,10 @@
+{
+  "eval_id": 3,
+  "eval_name": "local-check-json-and-renew-decision",
+  "prompt": "在本机 data 目录做证书巡检，输出 json，并根据退出码告诉我是否需要触发续签。",
+  "assertions": [
+    "使用 certman check --json 语义",
+    "明确解释 0/10/20/30 退出码",
+    "给出基于退出码的下一步动作"
+  ]
+}

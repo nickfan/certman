@@ -1,0 +1,20 @@
+{
+  "run_id": "eval-1-with_skill",
+  "expectations": [
+    {
+      "text": "使用 certmanctl 并包含 cert create + job wait 两步命令",
+      "passed": true,
+      "evidence": "commands 字段包含 cert create 和 job wait"
+    },
+    {
+      "text": "输出包含 surface/action/inputs/result/next_steps",
+      "passed": true,
+      "evidence": "output.json 包含全部字段"
+    },
+    {
+      "text": "错误类型使用统一枚举",
+      "passed": true,
+      "evidence": "result.error.type=TransportError"
+    }
+  ]
+}

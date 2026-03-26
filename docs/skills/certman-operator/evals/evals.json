@@ -1,0 +1,38 @@
+{
+  "skill_name": "certman-operator",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "控制面在 http://127.0.0.1:8000，帮我给 site-a 发证并等待任务完成，结果请结构化输出并给出失败分类。",
+      "expected_output": "使用 certmanctl 先 cert create 再 job wait，输出包含 surface/action/inputs/result/next_steps。",
+      "files": [],
+      "assertions": [
+        "使用 certmanctl 且包含 cert create 与 job wait",
+        "输出含 surface/action/inputs/result/next_steps",
+        "error.type 使用统一枚举"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "把 webhook id=abc123 改成 inactive，然后确认状态，endpoint 是 http://127.0.0.1:8000。",
+      "expected_output": "使用 webhook update + webhook get，正确传递 --id 和 --status，输出成功或 API 错误分类。",
+      "files": [],
+      "assertions": [
+        "先 webhook update 后 webhook get",
+        "参数包含 id=abc123 和 status=inactive",
+        "输出含错误分类与后续动作"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "在本机 data 目录做证书巡检，输出 json，并根据退出码告诉我是否需要触发续签。",
+      "expected_output": "使用 certman check --json，解释 exit code 0/10/20/30 的含义并给下一步建议。",
+      "files": [],
+      "assertions": [
+        "使用 certman check --json 语义",
+        "解释 0/10/20/30",
+        "基于退出码给出续签决策"
+      ]
+    }
+  ]
+}

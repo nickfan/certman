@@ -1,0 +1,19 @@
+{
+  "eval_id": 1,
+  "task_type": "baseline",
+  "surface": "certman-api",
+  "action": "issue_certificate_and_wait",
+  "inputs": {
+    "api_base": "http://127.0.0.1:8000",
+    "domain": "site-a"
+  },
+  "result": {
+    "success": false,
+    "error": "Service unreachable",
+    "failure_classification": "INFRASTRUCTURE_ERROR"
+  },
+  "next_steps": [
+    "restart port-forward",
+    "verify service"
+  ]
+}

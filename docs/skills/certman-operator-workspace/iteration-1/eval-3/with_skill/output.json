@@ -1,0 +1,29 @@
+{
+  "surface": "certman",
+  "action": "local certificate inspection with JSON output",
+  "inputs": {
+    "data_dir": "data"
+  },
+  "commands": [
+    "uv run certman -D data check --json"
+  ],
+  "result": {
+    "status": "failed",
+    "data": null,
+    "error": {
+      "type": "ValidationError",
+      "message": "本次环境未完成可执行验证，按计划输出",
+      "raw": null
+    }
+  },
+  "exit_code_semantics": {
+    "0": "OK",
+    "10": "WARN",
+    "20": "FORCE_RENEW",
+    "30": "MISSING_OR_BROKEN"
+  },
+  "next_steps": [
+    "若 exit code=20 立即触发 renew",
+    "若 exit code=30 排查缺失并重建证书"
+  ]
+}

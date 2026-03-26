@@ -1,0 +1,20 @@
+{
+  "run_id": "eval-3-without_skill",
+  "expectations": [
+    {
+      "text": "使用 certman check --json 语义",
+      "passed": false,
+      "evidence": "命令为 --output-format json，偏离当前 CLI 语义"
+    },
+    {
+      "text": "明确解释 0/10/20/30 退出码",
+      "passed": false,
+      "evidence": "仅给出 0/1/2"
+    },
+    {
+      "text": "给出基于退出码的下一步动作",
+      "passed": true,
+      "evidence": "提供了 exit!=0 触发 renew"
+    }
+  ]
+}

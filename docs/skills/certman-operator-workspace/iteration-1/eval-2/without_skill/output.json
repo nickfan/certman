@@ -1,0 +1,10 @@
+{
+  "eval_id": 2,
+  "task_type": "baseline",
+  "commands": [
+    "curl -X PATCH http://127.0.0.1:8000/api/webhooks/abc123 -H 'Content-Type: application/json' -d '{\"is_active\": false}'",
+    "curl -X GET http://127.0.0.1:8000/api/webhooks/abc123"
+  ],
+  "execution_status": "not_executed",
+  "error_classification": null
+}
