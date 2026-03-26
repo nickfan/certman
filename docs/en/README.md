@@ -45,6 +45,8 @@
 ### 📋 Additional Resources
 
 - [Kubernetes Service Design (../k8s-service-design.md)](../k8s-service-design.md)
+- [Dual CLI Modes (dual-cli-modes.md)](dual-cli-modes.md)
+- [Dual CLI Program Plan (../notes/plans/2026-03-26-dual-cli-program.md)](../notes/plans/2026-03-26-dual-cli-program.md)
 - Release notes & Version history
 
 ---
@@ -107,6 +109,7 @@ docs/
 - 🔗 [Layered Cookbook](cookbook-layered.md)
 - 🔗 [Layered Manual](manual-layered.md)
 - 🔗 [Provider Setup](../dns-providers.md)
+- 🔗 [Dual CLI Modes](dual-cli-modes.md)
 
 ---
 

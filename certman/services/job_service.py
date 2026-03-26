@@ -81,6 +81,22 @@ class JobService:
             job = session.get(JobORM, job_id)
             return self._to_record(job) if job is not None else None
 
+    def list_jobs(
+        self,
+        *,
+        subject_id: str | None = None,
+        status: str | None = None,
+        limit: int = 50,
+    ) -> list[JobRecord]:
+        with self._session_factory() as session:
+            query = session.query(JobORM)
+            if subject_id is not None:
+                query = query.filter(JobORM.subject_id == subject_id)
+            if status is not None:
+                query = query.filter(JobORM.status == status)
+            jobs = query.order_by(JobORM.created_at.desc()).limit(limit).all()
+            return [self._to_record(j) for j in jobs]
+
     def update_status(self, job_id: str, *, status: str, result: str | None = None, error: str | None = None) -> JobRecord | None:
         with self._session_factory() as session:
             job = session.get(JobORM, job_id)

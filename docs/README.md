@@ -15,6 +15,7 @@ Welcome to certman documentation! Choose your language:
   - [Layered Cookbook (CLI/Agent/Service)](en/cookbook-layered.md)
   - [Layered Manual (CLI/Agent/Service)](en/manual-layered.md)
   - [DNS Provider Setup](en/dns-providers.md)
+  - [Dual CLI Modes (Local + Control Plane Client)](en/dual-cli-modes.md)
 
 ### 🇨🇳 中文文档
 
@@ -25,6 +26,7 @@ Welcome to certman documentation! Choose your language:
   - [三层场景手册（CLI/Agent/Service）](zh-CN/cookbook-layered.md)
   - [三层运维手册（CLI/Agent/Service）](zh-CN/manual-layered.md)
   - [DNS Provider 配置](zh-CN/dns-providers.md)
+  - [双 CLI 模式（Local + Control Plane Client）](zh-CN/dual-cli-modes.md)
 
 ---
 
@@ -34,6 +36,7 @@ These documents are used by all language versions:
 
 - **DNS Providers**: [dns-providers.md](dns-providers.md) - Setup for Route53, Cloudflare, and Aliyun
 - **Kubernetes Deployment**: [k8s-service-design.md](k8s-service-design.md) - K8s integration guide
+- **Dual CLI Program**: [notes/plans/2026-03-26-dual-cli-program.md](notes/plans/2026-03-26-dual-cli-program.md) - Requirement, architecture, and implementation plan
 
 ---
 

@@ -148,6 +148,60 @@ class WebhookService:
 
         return deliveries
 
+    def list_subscriptions(
+        self,
+        *,
+        topic: str | None = None,
+        status: str | None = None,
+    ) -> list[WebhookSubscriptionRecord]:
+        with self._session_factory() as session:
+            query = session.query(WebhookSubscriptionORM)
+            if topic is not None:
+                query = query.filter(WebhookSubscriptionORM.topic == topic)
+            if status is not None:
+                query = query.filter(WebhookSubscriptionORM.status == status)
+            subscriptions = query.order_by(WebhookSubscriptionORM.created_at.desc()).all()
+            return [self._to_subscription_record(s) for s in subscriptions]
+
+    def get_subscription(self, subscription_id: str) -> WebhookSubscriptionRecord | None:
+        with self._session_factory() as session:
+            sub = session.get(WebhookSubscriptionORM, subscription_id)
+            return self._to_subscription_record(sub) if sub is not None else None
+
+    def update_subscription(
+        self,
+        subscription_id: str,
+        *,
+        endpoint: str | None = None,
+        secret: str | None = None,
+        status: str | None = None,
+    ) -> WebhookSubscriptionRecord | None:
+        if endpoint is not None and not endpoint.startswith("http://") and not endpoint.startswith("https://"):
+            raise ValueError("webhook endpoint must start with http:// or https://")
+        with self._session_factory() as session:
+            sub = session.get(WebhookSubscriptionORM, subscription_id)
+            if sub is None:
+                return None
+            if endpoint is not None:
+                sub.endpoint = endpoint
+            if secret is not None:
+                sub.secret = secret
+            if status is not None:
+                sub.status = status
+            sub.updated_at = datetime.now(timezone.utc)
+            session.add(sub)
+            session.commit()
+            return self._to_subscription_record(sub)
+
+    def delete_subscription(self, subscription_id: str) -> bool:
+        with self._session_factory() as session:
+            sub = session.get(WebhookSubscriptionORM, subscription_id)
+            if sub is None:
+                return False
+            session.delete(sub)
+            session.commit()
+            return True
+
     @staticmethod
     def _sign_payload(secret: str, payload: bytes) -> str:
         return hmac.new(secret.encode("utf-8"), payload, hashlib.sha256).hexdigest()

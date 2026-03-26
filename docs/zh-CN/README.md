@@ -45,6 +45,8 @@
 ### 📋 其他文档
 
 - [Kubernetes 部署设计 (../k8s-service-design.md)](../k8s-service-design.md)
+- [双 CLI 模式说明 (dual-cli-modes.md)](dual-cli-modes.md)
+- [双 CLI 实施总方案 (../notes/plans/2026-03-26-dual-cli-program.md)](../notes/plans/2026-03-26-dual-cli-program.md)
 
 ---
 
@@ -106,3 +108,4 @@ docs/
 - 🔗 [三层快速指南](quickguide-layered.md)
 - 🔗 [三层场景手册](cookbook-layered.md)
 - 🔗 [三层运维手册](manual-layered.md)
+- 🔗 [双 CLI 模式说明](dual-cli-modes.md)

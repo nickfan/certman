@@ -25,6 +25,7 @@ dependencies = [
 
 [project.scripts]
 certman = "certman.cli:main"
+certmanctl = "certman.ctl.cli:main"
 certman-agent = "certman.node_agent.agent:main"
 certman-server = "certman.server:main"
 certman-worker = "certman.worker:main"

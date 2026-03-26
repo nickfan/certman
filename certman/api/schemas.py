@@ -40,6 +40,25 @@ class WebhookSubscriptionRequest(BaseModel):
     secret: str
 
 
+class WebhookResponse(BaseModel):
+    id: str
+    topic: str
+    endpoint: str
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class UpdateWebhookRequest(BaseModel):
+    endpoint: str | None = None
+    secret: str | None = None
+    status: str | None = None
+
+
+class RenewCertRequest(BaseModel):
+    entry_name: str
+
+
 class PollRequest(BaseModel):
     node_id: str
     timestamp: int
