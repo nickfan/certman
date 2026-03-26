@@ -111,6 +111,23 @@ curl -X POST http://127.0.0.1:8000/api/v1/webhooks \
   -d '{"topic":"job.completed","endpoint":"https://example.test/hook","secret":"topsecret"}'
 ```
 
+控制面 API 文档地址：
+
+```text
+http://127.0.0.1:8000/docs
+http://127.0.0.1:8000/redoc
+http://127.0.0.1:8000/openapi.json
+```
+
+通过 `certmanctl` 远程操作示例：
+
+```bash
+uv run certmanctl --endpoint http://127.0.0.1:8000 health
+uv run certmanctl --endpoint http://127.0.0.1:8000 cert create --entry-name site-a
+uv run certmanctl --endpoint http://127.0.0.1:8000 job list --subject-id site-a
+uv run certmanctl --endpoint http://127.0.0.1:8000 webhook list
+```
+
 可选脚本化 e2e 验证（compose/k8s）：
 
 ```bash
@@ -126,6 +143,7 @@ python scripts/e2e-test.py --k8s-only
 - 三层快速指南: [docs/zh-CN/quickguide-layered.md](docs/zh-CN/quickguide-layered.md)
 - 三层场景手册: [docs/zh-CN/cookbook-layered.md](docs/zh-CN/cookbook-layered.md)
 - 三层运维手册: [docs/zh-CN/manual-layered.md](docs/zh-CN/manual-layered.md)
+- API 与 AI 接入: [docs/zh-CN/api-access.md](docs/zh-CN/api-access.md)
 - DNS Provider 配置: [docs/zh-CN/dns-providers.md](docs/zh-CN/dns-providers.md)
 - 📖 [English Documentation](docs/en/) - Complete guides in English
 
@@ -195,6 +213,7 @@ docker compose run --rm certman check --warn-days 30 --force-renew-days 7 --fix
 - webhook 订阅和投递记录持久化在控制面数据库中
 - `certman-worker` 与 `certman-server` 共享同一份 SQLite 数据库
 - `certman-agent` 仍是受控节点入口，Phase 4 的签名/加密原语已就绪，后续可继续扩展远程通信链路
+- 当前面向 AI 的正式接入面包含 REST + OpenAPI，以及通过 `certman-mcp` 提供的 stdio MCP Server（封装控制面 API）。
 
 ## check 命令退出码
 

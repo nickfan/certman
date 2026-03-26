@@ -12,6 +12,25 @@ from certman.ctl.cli import _call_api, app
 runner = CliRunner()
 
 
+def test_ctl_cli_top_help_contains_positioning() -> None:
+    result = runner.invoke(app, ["--help"])
+
+    assert result.exit_code == 0
+    assert "control-plane CLI client" in result.stdout
+    assert "--endpoint" in result.stdout
+    assert "--timeout" in result.stdout
+    assert "--output" in result.stdout
+
+
+def test_ctl_job_wait_help_contains_key_options() -> None:
+    result = runner.invoke(app, ["job", "wait", "--help"])
+
+    assert result.exit_code == 0
+    assert "--job-id" in result.stdout
+    assert "--poll-interval" in result.stdout
+    assert "--max-wait" in result.stdout
+
+
 def test_ctl_health_text_success(monkeypatch) -> None:
     def fake_call(*, method: str, path: str, endpoint: str, timeout: float, token: str | None, payload=None):
         assert method == "GET"
@@ -155,3 +174,46 @@ def test_call_api_maps_request_error_to_network_error(monkeypatch) -> None:
         assert str(exc).startswith("NETWORK_ERROR:")
     else:
         raise AssertionError("expected ConnectionError")
+
+
+def test_ctl_cert_get_url_encodes_entry_name(monkeypatch) -> None:
+    observed: dict[str, str] = {}
+
+    def fake_call(*, method: str, path: str, endpoint: str, timeout: float, token: str | None, payload=None, params=None):
+        observed["method"] = method
+        observed["path"] = path
+        return [{"job_id": "job-1"}]
+
+    monkeypatch.setattr("certman.ctl.cli._call_api", fake_call)
+
+    result = runner.invoke(app, ["cert", "get", "--entry-name", "site/a b"])
+
+    assert result.exit_code == 0
+    assert observed == {
+        "method": "GET",
+        "path": "/api/v1/certificates/site%2Fa%20b",
+    }
+
+
+def test_ctl_job_list_uses_query_params_dict(monkeypatch) -> None:
+    observed: dict[str, object] = {}
+
+    def fake_call(*, method: str, path: str, endpoint: str, timeout: float, token: str | None, payload=None, params=None):
+        observed["method"] = method
+        observed["path"] = path
+        observed["params"] = params
+        return []
+
+    monkeypatch.setattr("certman.ctl.cli._call_api", fake_call)
+
+    result = runner.invoke(
+        app,
+        ["job", "list", "--subject-id", "a&b", "--status", "running", "--limit", "7"],
+    )
+
+    assert result.exit_code == 0
+    assert observed == {
+        "method": "GET",
+        "path": "/api/v1/jobs",
+        "params": {"subject_id": "a&b", "status": "running", "limit": 7},
+    }

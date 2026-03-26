@@ -110,3 +110,26 @@ Validation:
 
 - downstream receives signed callback.
 - delivery failures visible in service logs.
+
+## Scenario 8: Remote Operations with certmanctl (Service)
+
+Goal: let operators and automation manage the control plane without composing raw curl requests.
+
+Steps:
+
+```bash
+uv run certmanctl --endpoint http://127.0.0.1:8000 health
+uv run certmanctl --endpoint http://127.0.0.1:8000 cert create --entry-name site-a
+uv run certmanctl --endpoint http://127.0.0.1:8000 job wait --job-id <job_id>
+uv run certmanctl --endpoint http://127.0.0.1:8000 webhook list
+```
+
+Validation:
+
+- `certmanctl` output matches the REST payload semantics.
+- operators can complete issue/query/webhook workflows without hand-writing HTTP.
+
+Pitfalls:
+
+- wrong `--endpoint` is a transport problem, not an API business error.
+- `job wait` exits only after `completed`, `failed`, or `cancelled`.

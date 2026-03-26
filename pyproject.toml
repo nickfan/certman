@@ -13,6 +13,7 @@ dependencies = [
     "cryptography>=45.0.7",
     "fastapi>=0.116.1",
     "httpx>=0.28.1",
+    "mcp>=1.17.0",
     "pydantic>=2.12.5",
     "pydantic-settings>=2.12.0",
     "python-dotenv>=1.2.1",
@@ -26,6 +27,7 @@ dependencies = [
 [project.scripts]
 certman = "certman.cli:main"
 certmanctl = "certman.ctl.cli:main"
+certman-mcp = "certman.mcp_server:main"
 certman-agent = "certman.node_agent.agent:main"
 certman-server = "certman.server:main"
 certman-worker = "certman.worker:main"

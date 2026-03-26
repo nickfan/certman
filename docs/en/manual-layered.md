@@ -80,7 +80,15 @@ Exports from certbot live path into data/output/<entry>/.
 
 ## 4. Service API Manual
 
-### 4.1 Submit Issue Job
+### 4.0 Live API documentation
+
+- Swagger UI: `/docs`
+- ReDoc: `/redoc`
+- OpenAPI JSON: `/openapi.json`
+
+These endpoints are exposed directly by `certman-server`.
+
+### 4.1 Certificate APIs
 
 POST /api/v1/certificates
 
@@ -94,19 +102,63 @@ POST /api/v1/certificates
 {"success":true,"data":{"job_id":"..."}}
 ```
 
-### 4.2 Query Job
+GET /api/v1/certificates
+
+- returns recent certificate-related jobs (`issue` + `renew`).
+
+GET /api/v1/certificates/{entry_name}
+
+- returns jobs for one configured entry.
+
+POST /api/v1/certificates/{entry_name}/renew
+
+```json
+{"success":true,"data":{"job_id":"...","created":true}}
+```
+
+If a queued renew job already exists for the same entry, the existing job is reused and `created=false`.
+
+### 4.2 Job APIs
+
+GET /api/v1/jobs
+
+- supports `subject_id`, `status`, `limit` query filters.
 
 GET /api/v1/jobs/{job_id}
 
 Status enum: queued, running, completed, failed, cancelled.
 
-### 4.3 Register Webhook
+### 4.3 Webhook APIs
 
 POST /api/v1/webhooks
 
 ```json
 {"topic":"job.completed","endpoint":"https://ops.example/hook","secret":"topsecret"}
 ```
+
+GET /api/v1/webhooks
+
+- list subscriptions with optional topic/status filters.
+
+GET /api/v1/webhooks/{subscription_id}
+
+- fetch one subscription.
+
+PUT /api/v1/webhooks/{subscription_id}
+
+- update endpoint, secret, or status.
+
+DELETE /api/v1/webhooks/{subscription_id}
+
+- remove a subscription.
+
+### 4.4 Node registration API
+
+POST /api/v1/nodes/register
+
+- requires a one-time registration token.
+- accepts a PEM-encoded Ed25519 public key.
+- returns `poll_endpoint` for subsequent agent polling.
 
 ## 5. Agent Protocol Manual
 
@@ -140,20 +192,36 @@ Constraints:
 - node ownership must match
 - signature covers job_id/status/output/error payload
 
-## 6. State Machine and Concurrency
+## 6. Remote CLI Manual (`certmanctl`)
+
+Primary commands:
+
+- `certmanctl health`
+- `certmanctl cert create|list|get|renew`
+- `certmanctl job get|list|wait`
+- `certmanctl webhook create|list|get|update|delete`
+
+`certmanctl` is a user-facing wrapper over REST. It is the recommended interface for shell automation that prefers stable command names and exit codes.
+
+## 7. MCP Status
+
+- This repository provides a stdio MCP server via `certman-mcp`.
+- Start with `uv run certman-mcp --endpoint http://127.0.0.1:8000` and use it as a tool wrapper over control-plane REST APIs.
+
+## 8. State Machine and Concurrency
 
 - initial state: queued
 - claim transition: queued -> running (atomic)
 - completion: running -> completed or failed
 - renew uniqueness: max one queued/running per subject
 
-## 7. Security Baseline
+## 9. Security Baseline
 
 - nonce TTL: 3600s default, align with retry window
 - node clock skew: keep within 60s target
 - key rotation: recommend quarterly rotation with migration window
 
-## 8. Production Baseline
+## 10. Production Baseline
 
 - run daily check + alert, keep renew outside alert path
 - ensure server and worker share same persistent db_path

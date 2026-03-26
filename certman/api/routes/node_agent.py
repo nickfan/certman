@@ -11,7 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from cryptography.hazmat.primitives import serialization
 
 from certman.api.deps import get_job_service
-from certman.api.schemas import ApiResponse, PollRequest, ResultReportRequest
+from certman.api.schemas import ApiResponse, PollAssignmentResponse, PollRequest, PollResponse, ResultAckResponse, ResultReportRequest
 from certman.config import resolve_runtime_path
 from certman.db.engine import make_session_factory
 from certman.db.models import NodeNonceORM, NodeORM
@@ -29,8 +29,14 @@ class ActiveNode:
     public_key_pem: str
 
 
-@router.post("/poll", response_model=ApiResponse)
-def poll(payload: PollRequest, request: Request, service: JobService = Depends(get_job_service)) -> ApiResponse:
+@router.post(
+    "/poll",
+    response_model=ApiResponse[PollResponse],
+    summary="Poll for assignments",
+    description="Validate a signed agent heartbeat, store replay-protected nonce state, and optionally return claimed assignments for the requesting node.",
+    response_description="Assignment list and minimum supported agent version",
+)
+def poll(payload: PollRequest, request: Request, service: JobService = Depends(get_job_service)) -> ApiResponse[PollResponse]:
     runtime = request.app.state.runtime
     node = _get_active_node(runtime, payload.node_id)
     public_key = serialization.load_pem_public_key(node.public_key_pem.encode("utf-8"))
@@ -62,19 +68,25 @@ def poll(payload: PollRequest, request: Request, service: JobService = Depends(g
             payload=bundle_payload,
         )
         assignments.append(
-            {
-                "job_id": assignment.job_id,
-                "job_type": assignment.job_type,
-                "bundle_url": f"/api/v1/node-agent/bundles/{assignment.job_id}",
-                "bundle_signature": bundle_signature,
-            }
+            PollAssignmentResponse(
+                job_id=assignment.job_id,
+                job_type=assignment.job_type,
+                bundle_url=f"/api/v1/node-agent/bundles/{assignment.job_id}",
+                bundle_signature=bundle_signature,
+            )
         )
 
-    return ApiResponse(success=True, data={"assignments": assignments, "min_agent_version": "0.1.0"})
+    return ApiResponse(success=True, data=PollResponse(assignments=assignments, min_agent_version="0.1.0"))
 
 
-@router.post("/result", response_model=ApiResponse)
-def report_result(payload: ResultReportRequest, request: Request, service: JobService = Depends(get_job_service)) -> ApiResponse:
+@router.post(
+    "/result",
+    response_model=ApiResponse[ResultAckResponse],
+    summary="Report assignment result",
+    description="Validate a signed result report from an agent and persist the terminal job state.",
+    response_description="Acknowledged job result",
+)
+def report_result(payload: ResultReportRequest, request: Request, service: JobService = Depends(get_job_service)) -> ApiResponse[ResultAckResponse]:
     runtime = request.app.state.runtime
     node = _get_active_node(runtime, payload.node_id)
     public_key = serialization.load_pem_public_key(node.public_key_pem.encode("utf-8"))
@@ -107,7 +119,10 @@ def report_result(payload: ResultReportRequest, request: Request, service: JobSe
         result=payload.output if payload.status == "completed" else None,
         error=payload.error if payload.status == "failed" else None,
     )
-    return ApiResponse(success=True, data={"job_id": payload.job_id, "status": updated.status if updated else payload.status})
+    return ApiResponse(
+        success=True,
+        data=ResultAckResponse(job_id=payload.job_id, status=updated.status if updated else payload.status),
+    )
 
 
 def _get_active_node(runtime, node_id: str) -> ActiveNode:

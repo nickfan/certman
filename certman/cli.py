@@ -13,7 +13,14 @@ from certman.services.cert_service import CertService, resolve_entry_cert_name
 from certman.services.export_service import ExportService
 
 
-app = typer.Typer(add_completion=False)
+app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help=(
+        "CertMan local CLI. Use this entrypoint for single-host certificate operations "
+        "(issue, renew, export, check, config validate, logs cleanup)."
+    ),
+)
 
 _export_service = ExportService()
 
@@ -36,6 +43,12 @@ def _callback(
         envvar="CERTMAN_CONFIG_FILE",
     ),
 ):
+    """Initialize runtime for local commands.
+
+    Examples:
+    - certman -D data entries
+    - certman -D data -c config.toml check --warn-days 30
+    """
     runtime = create_runtime(data_dir=data_dir, config_file=config_file)
     ctx.obj = runtime
 
@@ -46,7 +59,12 @@ def _service(ctx: typer.Context) -> CertService:
 
 @app.command("config-validate")
 def config_validate(ctx: typer.Context):
-    """Validate config and required env secrets."""
+    """Validate config and required env secrets.
+
+    Exit code:
+    - 0: valid
+    - non-zero: validation failure
+    """
     runtime = ctx.obj
     runtime.config.validate_required_secrets(runtime.env)
     typer.echo("OK")
@@ -67,7 +85,10 @@ def logs_clean(
 
 @app.command("entries")
 def entries(ctx: typer.Context):
-    """List merged entries from config."""
+    """List merged entries from config.
+
+    Output columns: entry name, provider, primary domain, SAN domains.
+    """
     runtime = ctx.obj
     for entry in runtime.config.entries:
         domains = entry_domains(entry)
@@ -80,10 +101,10 @@ def entries(ctx: typer.Context):
 def new(
     ctx: typer.Context,
     name: str = typer.Option(
-        ..., "--name", "-n", help="Issue a new certificate for one entry"
+        ..., "--name", "-n", help="Entry name defined in config.entries"
     ),
     force: bool = typer.Option(
-        False, "--force", "-f", help="Force re-issue even if exists"
+        False, "--force", "-f", help="Force re-issue even if a valid certificate already exists"
     ),
     export_: bool = typer.Option(
         True,
@@ -97,7 +118,12 @@ def new(
         help="Stream certbot output to terminal (useful for debugging)",
     ),
 ):
-    """Issue (new) certificate for an entry."""
+    """Issue (new) certificate for an entry.
+
+    Typical flow:
+    1) certman new --name <entry>
+    2) certman export --name <entry>
+    """
     try:
         result = _service(ctx).issue(name, force=force, verbose=verbose)
     except ValueError as exc:
@@ -127,10 +153,10 @@ def new(
 @app.command("renew")
 def renew(
     ctx: typer.Context,
-    all: bool = typer.Option(False, "--all", "-a", help="Renew all entries"),
-    name: str | None = typer.Option(None, "--name", "-n", help="Renew a single entry"),
+    all: bool = typer.Option(False, "--all", "-a", help="Renew all configured entries"),
+    name: str | None = typer.Option(None, "--name", "-n", help="Renew one specific entry"),
     force: bool = typer.Option(
-        False, "--force", "-f", help="Force renew even if not due"
+        False, "--force", "-f", help="Force renew even if certbot does not consider it due"
     ),
     dry_run: bool = typer.Option(
         False,
@@ -208,8 +234,8 @@ def renew(
 @app.command("export")
 def export(
     ctx: typer.Context,
-    all: bool = typer.Option(False, "--all", "-a", help="Export all entries"),
-    name: str | None = typer.Option(None, "--name", "-n", help="Export a single entry"),
+    all: bool = typer.Option(False, "--all", "-a", help="Export all configured entries"),
+    name: str | None = typer.Option(None, "--name", "-n", help="Export one specific entry"),
     overwrite: bool = typer.Option(
         True, "--overwrite/--no-overwrite", help="Overwrite files in output"
     ),
@@ -289,7 +315,7 @@ def check(
     force_renew_days: int = typer.Option(
         7, "--force-renew-days", "-F", help="Fail when expires within N days"
     ),
-    name: str | None = typer.Option(None, "--name", "-n", help="Check a single entry"),
+    name: str | None = typer.Option(None, "--name", "-n", help="Check one specific entry"),
     fix: bool = typer.Option(False, "--fix", help="Auto-fix by running new/renew"),
     json_output: bool = typer.Option(False, "--json", help="Output JSON"),
 ):

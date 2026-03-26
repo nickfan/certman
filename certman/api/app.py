@@ -15,6 +15,30 @@ from certman.events import EventBus
 from certman.services.webhook_service import WebhookService
 
 
+OPENAPI_TAGS = [
+    {"name": "health", "description": "Runtime health and readiness endpoints."},
+    {"name": "certificates", "description": "Certificate issuance and renewal job submission APIs."},
+    {"name": "jobs", "description": "Queued/running/completed job query APIs."},
+    {"name": "webhooks", "description": "Webhook subscription management APIs."},
+    {"name": "nodes", "description": "Node registration APIs."},
+    {"name": "node-agent", "description": "Signed polling and result reporting APIs for node agents."},
+]
+
+
+OPENAPI_DESCRIPTION = """
+CertMan control-plane HTTP API.
+
+Documentation endpoints:
+- `/docs`: Swagger UI
+- `/redoc`: ReDoc
+- `/openapi.json`: machine-readable OpenAPI schema
+
+Notes:
+- `/health` is the only endpoint that does not use the `ApiResponse` envelope.
+- The current AI integration surface is REST + OpenAPI; MCP access is provided by the `certman-mcp` stdio server.
+""".strip()
+
+
 def create_app(*, data_dir: str = "data", config_file: str | None = None) -> FastAPI:
     runtime = create_runtime(data_dir=data_dir, config_file=config_file)
     if runtime.config.server is None:
@@ -29,7 +53,16 @@ def create_app(*, data_dir: str = "data", config_file: str | None = None) -> Fas
             lambda event, service=webhook_service: service.publish_event(topic=event.topic, payload=event.payload),
         )
 
-    app = FastAPI(title="CertMan Control Plane")
+    app = FastAPI(
+        title="CertMan Control Plane",
+        version="0.1.0",
+        summary="Control-plane API for certificate jobs, nodes, agents, and webhooks",
+        description=OPENAPI_DESCRIPTION,
+        docs_url="/docs",
+        redoc_url="/redoc",
+        openapi_url="/openapi.json",
+        openapi_tags=OPENAPI_TAGS,
+    )
     app.state.runtime = runtime
     app.state.event_bus = event_bus
     app.state.webhook_service = webhook_service

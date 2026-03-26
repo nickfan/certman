@@ -66,8 +66,17 @@ CertMan 面向两类用户：
 
 - health
 - cert create
+- cert list
+- cert get
+- cert renew
 - job get
+- job list
+- job wait
 - webhook create
+- webhook list
+- webhook get
+- webhook update
+- webhook delete
 
 ## 5. 兼容策略
 
@@ -77,7 +86,17 @@ CertMan 面向两类用户：
 
 ## 6. 当前阶段状态
 
-当前阶段已完成文档与方案冻结，下一阶段进入编码实现与测试核验。
+双 CLI 拆分的当前远程控制面 MVP 已落地。
+
+当前远程运维入口：
+
+- `certmanctl`：控制面 REST 客户端入口
+- `/docs`、`/redoc`、`/openapi.json`：`certman-server` 实时 OpenAPI 文档
+
+当前 AI 接入选项：
+
+- 通过 `certman-mcp` 使用 MCP（stdio 传输）
+- 通过 REST + OpenAPI 做直接 HTTP 集成
 
 相关计划文档：
 

@@ -14,6 +14,8 @@ Welcome to certman documentation! Choose your language:
   - [Layered Quick Guide (CLI/Agent/Service)](en/quickguide-layered.md)
   - [Layered Cookbook (CLI/Agent/Service)](en/cookbook-layered.md)
   - [Layered Manual (CLI/Agent/Service)](en/manual-layered.md)
+  - [API & AI Access](en/api-access.md)
+  - [CLI Help Reference](en/cli-help-reference.md)
   - [DNS Provider Setup](en/dns-providers.md)
   - [Dual CLI Modes (Local + Control Plane Client)](en/dual-cli-modes.md)
 
@@ -25,6 +27,8 @@ Welcome to certman documentation! Choose your language:
   - [三层快速指南（CLI/Agent/Service）](zh-CN/quickguide-layered.md)
   - [三层场景手册（CLI/Agent/Service）](zh-CN/cookbook-layered.md)
   - [三层运维手册（CLI/Agent/Service）](zh-CN/manual-layered.md)
+  - [API 与 AI 接入](zh-CN/api-access.md)
+  - [CLI 帮助参考](zh-CN/cli-help-reference.md)
   - [DNS Provider 配置](zh-CN/dns-providers.md)
   - [双 CLI 模式（Local + Control Plane Client）](zh-CN/dual-cli-modes.md)
 

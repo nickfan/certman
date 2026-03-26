@@ -35,6 +35,16 @@
   - config parameter impact map
   - API contracts, state machine, concurrency and security baseline
 
+- **[API & AI Access (api-access.md)](api-access.md)** - OpenAPI endpoints, remote CLI usage, and current AI integration surface
+  - `/docs`, `/redoc`, `/openapi.json`
+  - `certmanctl` to REST mapping
+  - MCP availability status
+
+- **[CLI Help Reference (cli-help-reference.md)](cli-help-reference.md)** - Local/remote CLI options and `--help` discovery guide
+  - `certman` command/options quick map
+  - `certmanctl` command/options quick map
+  - Skill preflight suggestions
+
 ### ⚡ DNS Provider Documentation
 
 - **[DNS Providers Configuration (../dns-providers.md)](../dns-providers.md)** - Setup guides for all supported providers
@@ -108,6 +118,8 @@ docs/
 - 🔗 [Layered Quick Guide](quickguide-layered.md)
 - 🔗 [Layered Cookbook](cookbook-layered.md)
 - 🔗 [Layered Manual](manual-layered.md)
+- 🔗 [API & AI Access](api-access.md)
+- 🔗 [CLI Help Reference](cli-help-reference.md)
 - 🔗 [Provider Setup](../dns-providers.md)
 - 🔗 [Dual CLI Modes](dual-cli-modes.md)
 

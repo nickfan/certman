@@ -35,6 +35,16 @@
   - 配置参数影响范围
   - API 契约、状态机、并发与安全基线
 
+- **[API 与 AI 接入 (api-access.md)](api-access.md)** - OpenAPI 地址、远程 CLI 用法与 AI 接入现状
+  - `/docs`、`/redoc`、`/openapi.json`
+  - `certmanctl` 与 REST 的对应关系
+  - MCP 可用性说明
+
+- **[CLI 帮助参考 (cli-help-reference.md)](cli-help-reference.md)** - Local/Remote CLI 参数速查与 `--help` 使用
+  - `certman` 命令与参数映射
+  - `certmanctl` 命令与参数映射
+  - skill preflight 建议
+
 ### ⚡ DNS Provider 文档
 
 - **[DNS Providers 配置 (../dns-providers.md)](../dns-providers.md)** - 三个Provider的详细配置和凭据管理
@@ -108,4 +118,6 @@ docs/
 - 🔗 [三层快速指南](quickguide-layered.md)
 - 🔗 [三层场景手册](cookbook-layered.md)
 - 🔗 [三层运维手册](manual-layered.md)
+- 🔗 [API 与 AI 接入](api-access.md)
+- 🔗 [CLI 帮助参考](cli-help-reference.md)
 - 🔗 [双 CLI 模式说明](dual-cli-modes.md)

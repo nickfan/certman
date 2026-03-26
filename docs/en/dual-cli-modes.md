@@ -66,8 +66,17 @@ To reduce cognitive load, CLI responsibilities are split:
 
 - health
 - cert create
+- cert list
+- cert get
+- cert renew
 - job get
+- job list
+- job wait
 - webhook create
+- webhook list
+- webhook get
+- webhook update
+- webhook delete
 
 ## 5. Compatibility policy
 
@@ -77,7 +86,17 @@ To reduce cognitive load, CLI responsibilities are split:
 
 ## 6. Current stage
 
-Documentation and architecture are now frozen. Next phase is implementation and verification.
+The dual-CLI split is now implemented for the current remote control-plane MVP.
+
+Current remote operator surfaces:
+
+- `certmanctl`: stable entrypoint for control-plane REST calls
+- `/docs`, `/redoc`, `/openapi.json`: live OpenAPI documentation from `certman-server`
+
+Current AI integration options:
+
+- MCP via `certman-mcp` (stdio transport)
+- REST + OpenAPI for direct HTTP integrations
 
 Program document:
 

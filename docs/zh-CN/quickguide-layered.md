@@ -95,7 +95,15 @@ uv run certman-server -D data
 uv run certman-worker -D data --loop --interval-seconds 30
 ```
 
-3. 提交发证任务 + 查询状态
+3. 打开实时 API 文档
+
+```text
+http://127.0.0.1:8000/docs
+http://127.0.0.1:8000/redoc
+http://127.0.0.1:8000/openapi.json
+```
+
+4. 提交发证任务 + 查询状态
 
 ```bash
 curl -X POST http://127.0.0.1:8000/api/v1/certificates \
@@ -103,6 +111,14 @@ curl -X POST http://127.0.0.1:8000/api/v1/certificates \
   -d '{"entry_name":"site-a"}'
 
 curl http://127.0.0.1:8000/api/v1/jobs/<job_id>
+```
+
+5. 使用远程 CLI 跑同一条链路
+
+```bash
+uv run certmanctl --endpoint http://127.0.0.1:8000 health
+uv run certmanctl --endpoint http://127.0.0.1:8000 cert create --entry-name site-a
+uv run certmanctl --endpoint http://127.0.0.1:8000 job list --subject-id site-a
 ```
 
 ## 3. Agent 层快速上手（受控节点）

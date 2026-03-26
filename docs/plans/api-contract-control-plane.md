@@ -30,28 +30,44 @@ class ErrorDetail(BaseModel):
 | 端点 | 方法 | 请求体 | 响应 | 幂等 |
 |---|---|---|---|---|
 | `/health` | GET | — | `{"status":"ok"}` | Y |
-| `/api/v1/certificates` | POST | `IssueCertRequest` | `202 + ApiResponse(data={"job_id": ...})` | `Idempotency-Key` header |
+| `/api/v1/certificates` | POST | `IssueCertRequest(entry_name)` | `202 + ApiResponse(data={"job_id": ...})` | N |
+| `/api/v1/certificates` | GET | — | `ApiResponse(data=[JobResponse, ...])` | Y |
+| `/api/v1/certificates/{entry_name}` | GET | — | `ApiResponse(data=[JobResponse, ...])` | Y |
+| `/api/v1/certificates/{entry_name}/renew` | POST | — | `202 + ApiResponse(data={"job_id": ..., "created": bool})` | Y (subject-level dedupe) |
+| `/api/v1/jobs` | GET | query: `subject_id?`, `status?`, `limit?` | `ApiResponse(data=[JobResponse, ...])` | Y |
 | `/api/v1/jobs/{id}` | GET | — | `ApiResponse(data=JobResponse)` | Y |
+| `/api/v1/nodes/register` | POST | `NodeRegisterRequest` | `201/200 + ApiResponse(data=NodeRegisterResponse)` | Y (node_id natural key) |
 | `/api/v1/node-agent/poll` | POST | `PollRequest(node_id, signature)` | `ApiResponse(data=PollResponse)` | N |
 | `/api/v1/node-agent/result` | POST | `ResultReport(job_id, status, ...)` | `ApiResponse(data=AckResponse)` | Y (job_id natural key) |
-| `/api/v1/webhooks` | POST | `WebhookSubscription` | `201 + ApiResponse(data={"id": ...})` | Y (topic+endpoint natural key) |
+| `/api/v1/webhooks` | POST | `WebhookSubscriptionRequest` | `201 + ApiResponse(data={"id": ...})` | Y (topic+endpoint natural key) |
+| `/api/v1/webhooks` | GET | query: `topic?`, `status?` | `ApiResponse(data=[WebhookResponse, ...])` | Y |
+| `/api/v1/webhooks/{id}` | GET | — | `ApiResponse(data=WebhookResponse)` | Y |
+| `/api/v1/webhooks/{id}` | PUT | `UpdateWebhookRequest` | `ApiResponse(data=WebhookResponse)` | Y |
+| `/api/v1/webhooks/{id}` | DELETE | — | `ApiResponse(data={"deleted": true})` | Y |
 
 ### 关键请求/响应模型（Pydantic 伪代码）
 
 ```python
 class IssueCertRequest(BaseModel):
     entry_name: str
-    domains: list[str]
-    provider: str
-    node_id: str | None = None   # None 表示 server 本地执行
 
 class JobResponse(BaseModel):
     job_id: str
+    job_type: str
     status: Literal["queued", "running", "completed", "failed", "cancelled"]
-    subject_id: str | None
+    subject_id: str
     node_id: str | None
+    attempts: int
     result: str | None
     error: str | None
+    created_at: datetime
+    updated_at: datetime
+
+class WebhookResponse(BaseModel):
+    id: str
+    topic: str
+    endpoint: str
+    status: str
     created_at: datetime
     updated_at: datetime
 
@@ -66,6 +82,13 @@ class PollResponse(BaseModel):
     assignments: list[TaskAssignment]
     min_agent_version: str
 
+class NodeRegisterResponse(BaseModel):
+    node_id: str
+    status: str
+    created: bool
+    public_key_fingerprint: str
+    poll_endpoint: str
+
 class TaskAssignment(BaseModel):
     job_id: str
     job_type: str
@@ -79,6 +102,15 @@ class ResultReport(BaseModel):
     error: str | None
     signature: str      # Ed25519 对 {job_id, status, output_hash} 的签名
 ```
+
+---
+
+## 2.1 实时文档与 AI 接入面
+
+- Swagger UI: `/docs`
+- ReDoc: `/redoc`
+- OpenAPI schema: `/openapi.json`
+- 提供 `certman-mcp`（stdio）作为 MCP 接入；也可直接通过 REST + OpenAPI 接入
 
 ---
 

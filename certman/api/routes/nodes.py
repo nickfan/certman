@@ -7,15 +7,21 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from fastapi import APIRouter, HTTPException, Request, Response, status
 
-from certman.api.schemas import ApiResponse, NodeRegisterRequest
+from certman.api.schemas import ApiResponse, NodeRegisterRequest, NodeRegisterResponse
 from certman.config import resolve_runtime_path
 from certman.services.node_service import NodeService
 
 router = APIRouter(prefix="/api/v1/nodes", tags=["nodes"])
 
 
-@router.post("/register", response_model=ApiResponse)
-def register_node(payload: NodeRegisterRequest, request: Request, response: Response) -> ApiResponse:
+@router.post(
+    "/register",
+    response_model=ApiResponse[NodeRegisterResponse],
+    summary="Register node",
+    description="Register a node identity by submitting an Ed25519 public key and a one-time registration token.",
+    response_description="Registered node metadata and poll endpoint",
+)
+def register_node(payload: NodeRegisterRequest, request: Request, response: Response) -> ApiResponse[NodeRegisterResponse]:
     runtime = request.app.state.runtime
     expected_token = runtime.env.get("CERTMAN_NODE_REGISTRATION_TOKEN")
     if not expected_token:
@@ -48,13 +54,13 @@ def register_node(payload: NodeRegisterRequest, request: Request, response: Resp
     response.status_code = status.HTTP_201_CREATED if result.created else status.HTTP_200_OK
     return ApiResponse(
         success=True,
-        data={
-            "node_id": result.node_id,
-            "status": result.status,
-            "created": result.created,
-            "public_key_fingerprint": fingerprint,
-            "poll_endpoint": "/api/v1/node-agent/poll",
-        },
+        data=NodeRegisterResponse(
+            node_id=result.node_id,
+            status=result.status,
+            created=result.created,
+            public_key_fingerprint=fingerprint,
+            poll_endpoint="/api/v1/node-agent/poll",
+        ),
     )
 
 

@@ -160,3 +160,26 @@ curl -X POST http://127.0.0.1:8000/api/v1/webhooks \
 常见坑：
 
 - endpoint 不可达或证书校验失败，需先做连通性演练。
+
+## 场景 8：通过 certmanctl 做远程运维（Service）
+
+目标：让运维和自动化无需手写 curl，也能操作控制面。
+
+操作：
+
+```bash
+uv run certmanctl --endpoint http://127.0.0.1:8000 health
+uv run certmanctl --endpoint http://127.0.0.1:8000 cert create --entry-name site-a
+uv run certmanctl --endpoint http://127.0.0.1:8000 job wait --job-id <job_id>
+uv run certmanctl --endpoint http://127.0.0.1:8000 webhook list
+```
+
+验证：
+
+- `certmanctl` 输出与 REST payload 语义一致。
+- 运维可不直接拼 HTTP 请求也能完成发证、查询与 webhook 管理闭环。
+
+常见坑：
+
+- `--endpoint` 配错时属于 CLI 传输失败，不是 API 业务错误。
+- `job wait` 只有在 job 进入 `completed`、`failed` 或 `cancelled` 后才会退出。

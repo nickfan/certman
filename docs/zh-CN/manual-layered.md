@@ -93,7 +93,15 @@ uv run certman -D data export --name site-a --overwrite
 
 ## 4. Service API 手册
 
-### 4.1 提交发证任务
+### 4.0 实时 API 文档
+
+- Swagger UI: `/docs`
+- ReDoc: `/redoc`
+- OpenAPI JSON: `/openapi.json`
+
+这些地址由 `certman-server` 直接暴露。
+
+### 4.1 证书相关 API
 
 POST /api/v1/certificates
 
@@ -109,13 +117,33 @@ POST /api/v1/certificates
 {"success":true,"data":{"job_id":"..."}}
 ```
 
-### 4.2 查询任务
+GET /api/v1/certificates
+
+- 返回最近的证书相关 job（`issue` + `renew`）。
+
+GET /api/v1/certificates/{entry_name}
+
+- 返回某个配置条目的 job 列表。
+
+POST /api/v1/certificates/{entry_name}/renew
+
+```json
+{"success":true,"data":{"job_id":"...","created":true}}
+```
+
+若同条目已经存在 queued 的 renew job，则复用已有 job，并返回 `created=false`。
+
+### 4.2 Job API
+
+GET /api/v1/jobs
+
+- 支持 `subject_id`、`status`、`limit` 查询过滤。
 
 GET /api/v1/jobs/{job_id}
 
 状态枚举：queued, running, completed, failed, cancelled。
 
-### 4.3 注册 webhook
+### 4.3 Webhook API
 
 POST /api/v1/webhooks
 
@@ -124,6 +152,30 @@ POST /api/v1/webhooks
 ```json
 {"topic":"job.completed","endpoint":"https://ops.example/hook","secret":"topsecret"}
 ```
+
+GET /api/v1/webhooks
+
+- 按 topic/status 过滤并返回订阅列表。
+
+GET /api/v1/webhooks/{subscription_id}
+
+- 查询单个订阅。
+
+PUT /api/v1/webhooks/{subscription_id}
+
+- 更新 endpoint、secret 或 status。
+
+DELETE /api/v1/webhooks/{subscription_id}
+
+- 删除订阅。
+
+### 4.4 节点注册 API
+
+POST /api/v1/nodes/register
+
+- 需要一次性 registration token。
+- 接收 PEM 编码的 Ed25519 公钥。
+- 返回后续 agent poll 用的 `poll_endpoint`。
 
 ## 5. Agent 协议手册
 
@@ -161,20 +213,36 @@ POST /api/v1/node-agent/result
 - 任务 node_id 必须与上报 node_id 一致（若已绑定）。
 - 签名覆盖 job_id/status/output/error 组合载荷。
 
-## 6. 状态机与并发语义
+## 6. 远程 CLI 手册（`certmanctl`）
+
+主要命令：
+
+- `certmanctl health`
+- `certmanctl cert create|list|get|renew`
+- `certmanctl job get|list|wait`
+- `certmanctl webhook create|list|get|update|delete`
+
+`certmanctl` 本质是 REST 的运维 CLI 封装，适合 shell 自动化和偏命令式的远程操作。
+
+## 7. MCP 状态
+
+- 本仓库已提供 `certman-mcp` 的 stdio MCP Server。
+- 可通过 `uv run certman-mcp --endpoint http://127.0.0.1:8000` 启动，并作为控制面 REST API 的工具封装层使用。
+
+## 8. 状态机与并发语义
 
 - job 创建初始状态：queued。
 - worker/agent 认领：queued -> running（原子更新）。
 - 执行完成：running -> completed 或 failed。
 - 同 subject 的 renew 任务在 queued/running 上唯一，避免重复堆积。
 
-## 7. 安全参数建议
+## 9. 安全参数建议
 
 - nonce TTL：默认 3600 秒，建议与最大重试窗口一致。
 - 节点时间偏差：建议控制在 60 秒内。
 - 签名密钥轮换：按季度轮换，轮换期保持双公钥兼容（若后续实现）。
 
-## 8. 生产建议基线
+## 10. 生产建议基线
 
 - 每日 check + 告警，不把续签逻辑塞入告警路径。
 - server 与 worker 共享同一 db_path 并做持久化备份。

@@ -4,6 +4,7 @@ import time
 from dataclasses import dataclass
 import json
 from typing import Any, Optional
+from urllib.parse import quote
 
 import httpx
 import typer
@@ -12,10 +13,17 @@ import typer
 EXIT_NETWORK_ERROR = 3
 EXIT_API_ERROR = 4
 
-app = typer.Typer(add_completion=False)
-cert_app = typer.Typer(add_completion=False)
-job_app = typer.Typer(add_completion=False)
-webhook_app = typer.Typer(add_completion=False)
+app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help=(
+        "CertMan control-plane CLI client. Use this entrypoint for remote operations "
+        "against certman-server (health, cert/job/webhook)."
+    ),
+)
+cert_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Certificate job commands")
+job_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Job query and wait commands")
+webhook_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Webhook subscription commands")
 app.add_typer(cert_app, name="cert")
 app.add_typer(job_app, name="job")
 app.add_typer(webhook_app, name="webhook")
@@ -46,6 +54,12 @@ def _callback(
     output: str = typer.Option("text", "--output", help="Output format: text|json"),
     token: str | None = typer.Option(None, "--token", help="Bearer token", envvar="CERTMAN_SERVER_TOKEN"),
 ) -> None:
+    """Initialize remote client options.
+
+    Examples:
+    - certmanctl --endpoint http://127.0.0.1:8000 health
+    - certmanctl --output json job get --job-id <id>
+    """
     if output not in {"text", "json"}:
         raise typer.BadParameter("output must be text or json")
     ctx.obj = CtlOptions(endpoint=endpoint.rstrip("/"), timeout=timeout, output=output, token=token)
@@ -59,6 +73,7 @@ def _call_api(
     timeout: float,
     token: str | None,
     payload: dict[str, Any] | None = None,
+    params: dict[str, Any] | None = None,
 ) -> Any:
     headers: dict[str, str] = {}
     if token:
@@ -66,7 +81,14 @@ def _call_api(
 
     url = f"{endpoint}{path}"
     try:
-        response = httpx.request(method=method, url=url, json=payload, timeout=timeout, headers=headers)
+        response = httpx.request(
+            method=method,
+            url=url,
+            json=payload,
+            params=params,
+            timeout=timeout,
+            headers=headers,
+        )
     except httpx.RequestError as exc:
         raise ConnectionError(f"NETWORK_ERROR:{exc}") from exc
 
@@ -132,6 +154,10 @@ def _run_or_exit(ctx: typer.Context, *, method: str, path: str, payload: dict[st
     _emit_result(result, options.output)
 
 
+def _path_segment(value: str) -> str:
+    return quote(value, safe="")
+
+
 # ---------------------------------------------------------------------------
 # health
 # ---------------------------------------------------------------------------
@@ -149,7 +175,7 @@ def health(ctx: typer.Context) -> None:
 @cert_app.command("create")
 def cert_create(
     ctx: typer.Context,
-    entry_name: str = typer.Option(..., "--entry-name", "-n", help="Entry name"),
+    entry_name: str = typer.Option(..., "--entry-name", "-n", help="Entry name defined on server config"),
 ) -> None:
     """Create a certificate issuance job."""
     _run_or_exit(
@@ -169,19 +195,19 @@ def cert_list(ctx: typer.Context) -> None:
 @cert_app.command("get")
 def cert_get(
     ctx: typer.Context,
-    entry_name: str = typer.Option(..., "--entry-name", "-n", help="Entry name"),
+    entry_name: str = typer.Option(..., "--entry-name", "-n", help="Entry name defined on server config"),
 ) -> None:
     """Get jobs for a specific certificate entry."""
-    _run_or_exit(ctx, method="GET", path=f"/api/v1/certificates/{entry_name}")
+    _run_or_exit(ctx, method="GET", path=f"/api/v1/certificates/{_path_segment(entry_name)}")
 
 
 @cert_app.command("renew")
 def cert_renew(
     ctx: typer.Context,
-    entry_name: str = typer.Option(..., "--entry-name", "-n", help="Entry name"),
+    entry_name: str = typer.Option(..., "--entry-name", "-n", help="Entry name defined on server config"),
 ) -> None:
     """Enqueue a renewal job for the given entry (idempotent)."""
-    _run_or_exit(ctx, method="POST", path=f"/api/v1/certificates/{entry_name}/renew")
+    _run_or_exit(ctx, method="POST", path=f"/api/v1/certificates/{_path_segment(entry_name)}/renew")
 
 
 # ---------------------------------------------------------------------------
@@ -191,10 +217,10 @@ def cert_renew(
 @job_app.command("get")
 def job_get(
     ctx: typer.Context,
-    job_id: str = typer.Option(..., "--job-id", help="Job ID"),
+    job_id: str = typer.Option(..., "--job-id", help="Control-plane job id"),
 ) -> None:
     """Get job details by id."""
-    _run_or_exit(ctx, method="GET", path=f"/api/v1/jobs/{job_id}")
+    _run_or_exit(ctx, method="GET", path=f"/api/v1/jobs/{_path_segment(job_id)}")
 
 
 @job_app.command("list")
@@ -202,24 +228,32 @@ def job_list(
     ctx: typer.Context,
     subject_id: Optional[str] = typer.Option(None, "--subject-id", help="Filter by subject_id"),
     status: Optional[str] = typer.Option(None, "--status", help="Filter by status"),
-    limit: int = typer.Option(50, "--limit", help="Max results"),
+    limit: int = typer.Option(50, "--limit", min=1, max=200, help="Max results (1-200)"),
 ) -> None:
     """List jobs with optional filters."""
-    path = "/api/v1/jobs"
-    params: list[str] = []
-    if subject_id:
-        params.append(f"subject_id={subject_id}")
-    if status:
-        params.append(f"status={status}")
-    params.append(f"limit={limit}")
-    path = path + "?" + "&".join(params)
-    _run_or_exit(ctx, method="GET", path=path)
+    options = _ctx_options(ctx)
+    try:
+        result = _call_api(
+            method="GET",
+            path="/api/v1/jobs",
+            endpoint=options.endpoint,
+            timeout=options.timeout,
+            token=options.token,
+            params={"subject_id": subject_id, "status": status, "limit": limit},
+        )
+    except ConnectionError as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=EXIT_NETWORK_ERROR) from exc
+    except RuntimeError as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=EXIT_API_ERROR) from exc
+    _emit_result(result, options.output)
 
 
 @job_app.command("wait")
 def job_wait(
     ctx: typer.Context,
-    job_id: str = typer.Option(..., "--job-id", help="Job ID"),
+    job_id: str = typer.Option(..., "--job-id", help="Control-plane job id"),
     poll_interval: float = typer.Option(3.0, "--poll-interval", help="Poll interval in seconds"),
     max_wait: float = typer.Option(120.0, "--max-wait", help="Maximum wait time in seconds"),
 ) -> None:
@@ -232,7 +266,7 @@ def job_wait(
         try:
             result = _call_api(
                 method="GET",
-                path=f"/api/v1/jobs/{job_id}",
+                path=f"/api/v1/jobs/{_path_segment(job_id)}",
                 endpoint=options.endpoint,
                 timeout=options.timeout,
                 token=options.token,
@@ -266,9 +300,9 @@ def job_wait(
 @webhook_app.command("create")
 def webhook_create(
     ctx: typer.Context,
-    topic: str = typer.Option(..., "--topic", help="Webhook topic"),
-    endpoint_url: str = typer.Option(..., "--endpoint-url", help="Webhook target URL"),
-    secret: str = typer.Option(..., "--secret", help="Webhook secret"),
+    topic: str = typer.Option(..., "--topic", help="Webhook event topic (for example: job.completed)"),
+    endpoint_url: str = typer.Option(..., "--endpoint-url", help="Webhook callback URL"),
+    secret: str = typer.Option(..., "--secret", help="Shared secret used by server to sign deliveries"),
 ) -> None:
     """Create webhook subscription."""
     _run_or_exit(
@@ -286,30 +320,38 @@ def webhook_list(
     status: Optional[str] = typer.Option(None, "--status", help="Filter by status"),
 ) -> None:
     """List webhook subscriptions."""
-    path = "/api/v1/webhooks"
-    params: list[str] = []
-    if topic:
-        params.append(f"topic={topic}")
-    if status:
-        params.append(f"status={status}")
-    if params:
-        path = path + "?" + "&".join(params)
-    _run_or_exit(ctx, method="GET", path=path)
+    options = _ctx_options(ctx)
+    try:
+        result = _call_api(
+            method="GET",
+            path="/api/v1/webhooks",
+            endpoint=options.endpoint,
+            timeout=options.timeout,
+            token=options.token,
+            params={"topic": topic, "status": status},
+        )
+    except ConnectionError as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=EXIT_NETWORK_ERROR) from exc
+    except RuntimeError as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=EXIT_API_ERROR) from exc
+    _emit_result(result, options.output)
 
 
 @webhook_app.command("get")
 def webhook_get(
     ctx: typer.Context,
-    subscription_id: str = typer.Option(..., "--id", help="Subscription ID"),
+    subscription_id: str = typer.Option(..., "--id", help="Webhook subscription id"),
 ) -> None:
     """Get a webhook subscription by id."""
-    _run_or_exit(ctx, method="GET", path=f"/api/v1/webhooks/{subscription_id}")
+    _run_or_exit(ctx, method="GET", path=f"/api/v1/webhooks/{_path_segment(subscription_id)}")
 
 
 @webhook_app.command("update")
 def webhook_update(
     ctx: typer.Context,
-    subscription_id: str = typer.Option(..., "--id", help="Subscription ID"),
+    subscription_id: str = typer.Option(..., "--id", help="Webhook subscription id"),
     endpoint_url: Optional[str] = typer.Option(None, "--endpoint-url", help="New endpoint URL"),
     secret: Optional[str] = typer.Option(None, "--secret", help="New secret"),
     status: Optional[str] = typer.Option(None, "--status", help="New status (active/inactive)"),
@@ -325,16 +367,16 @@ def webhook_update(
     if not payload:
         typer.echo("Nothing to update — provide at least one of --endpoint-url, --secret, --status")
         raise typer.Exit(code=1)
-    _run_or_exit(ctx, method="PUT", path=f"/api/v1/webhooks/{subscription_id}", payload=payload)
+    _run_or_exit(ctx, method="PUT", path=f"/api/v1/webhooks/{_path_segment(subscription_id)}", payload=payload)
 
 
 @webhook_app.command("delete")
 def webhook_delete(
     ctx: typer.Context,
-    subscription_id: str = typer.Option(..., "--id", help="Subscription ID"),
+    subscription_id: str = typer.Option(..., "--id", help="Webhook subscription id"),
 ) -> None:
     """Delete a webhook subscription."""
-    _run_or_exit(ctx, method="DELETE", path=f"/api/v1/webhooks/{subscription_id}")
+    _run_or_exit(ctx, method="DELETE", path=f"/api/v1/webhooks/{_path_segment(subscription_id)}")
 
 
 def main() -> None:

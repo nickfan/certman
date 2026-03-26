@@ -138,6 +138,23 @@ curl -X POST http://127.0.0.1:8000/api/v1/webhooks \
   -d '{"topic":"job.completed","endpoint":"https://example.test/hook","secret":"topsecret"}'
 ```
 
+Control-plane API documentation endpoints:
+
+```text
+http://127.0.0.1:8000/docs
+http://127.0.0.1:8000/redoc
+http://127.0.0.1:8000/openapi.json
+```
+
+Remote operator examples via `certmanctl`:
+
+```bash
+uv run certmanctl --endpoint http://127.0.0.1:8000 health
+uv run certmanctl --endpoint http://127.0.0.1:8000 cert create --entry-name site-a
+uv run certmanctl --endpoint http://127.0.0.1:8000 job list --subject-id site-a
+uv run certmanctl --endpoint http://127.0.0.1:8000 webhook list
+```
+
 More detailed docs:
 
 - [📖 Documentation Guide (English)](docs/en/) - Full navigation and all guides
@@ -146,6 +163,7 @@ More detailed docs:
 - Layered quick guide: [docs/en/quickguide-layered.md](docs/en/quickguide-layered.md)
 - Layered cookbook: [docs/en/cookbook-layered.md](docs/en/cookbook-layered.md)
 - Layered manual: [docs/en/manual-layered.md](docs/en/manual-layered.md)
+- API & AI access: [docs/en/api-access.md](docs/en/api-access.md)
 - DNS Providers: [docs/en/dns-providers.md](docs/en/dns-providers.md)
 - 📖 [中文文档导航 (Chinese Guide)](docs/zh-CN/) - 完整导航和所有指南
 
@@ -261,6 +279,7 @@ Recommended flow:
 - Webhook subscriptions are stored in the control-plane database and receive signed HTTP POST callbacks.
 - `certman-worker` processes queued jobs from the same SQLite database used by `certman-server`.
 - `certman-agent` remains the controlled-node entrypoint; Phase 4 security primitives are now available for its next control-plane integration step.
+- The current AI integration surface includes REST + OpenAPI and a stdio MCP server (`certman-mcp`) that wraps control-plane APIs.
 
 ## Certificate file formats
 

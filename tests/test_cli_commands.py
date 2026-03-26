@@ -8,6 +8,55 @@ from certman.cli import app
 from certman.services.export_service import ExportResult
 
 
+def test_local_cli_top_help_contains_positioning() -> None:
+    runner = CliRunner()
+    result = runner.invoke(app, ["--help"])
+
+    assert result.exit_code == 0
+    assert "local CLI" in result.stdout
+    assert "--data-dir" in result.stdout
+    assert "--config-file" in result.stdout
+
+
+def test_local_cli_check_help_contains_key_options(tmp_path: Path) -> None:
+    runner = CliRunner()
+    data_dir = tmp_path / "data"
+    conf_dir = data_dir / "conf"
+    conf_dir.mkdir(parents=True)
+    (conf_dir / "config.toml").write_text(
+        """
+run_mode = "local"
+
+[global]
+data_dir = "data"
+email = "ops@example.com"
+
+[[entries]]
+name = "site-a"
+primary_domain = "example.com"
+dns_provider = "aliyun"
+""".strip(),
+        encoding="utf-8",
+    )
+    result = runner.invoke(
+        app,
+        [
+            "--data-dir",
+            str(data_dir),
+            "--config-file",
+            "config.toml",
+            "check",
+            "--help",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "--warn-days" in result.stdout
+    assert "--force-renew-days" in result.stdout
+    assert "--fix" in result.stdout
+    assert "--json" in result.stdout
+
+
 def test_new_command_delegates_to_service_and_export(monkeypatch, tmp_path: Path) -> None:
     data_dir = tmp_path / "data"
     conf_dir = data_dir / "conf"
