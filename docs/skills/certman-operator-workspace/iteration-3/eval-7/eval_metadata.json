@@ -1,0 +1,13 @@
+{
+  "eval_id": 7,
+  "eval_name": "mcp-server-setup",
+  "iteration": 3,
+  "prompt": "我想把 CertMan 以 MCP 方式接入 Claude Desktop，控制面地址是 http://127.0.0.1:8000，请告诉我如何启动 MCP server，以及 Claude Desktop 的配置方式，token 是 jwt-abc。",
+  "assertions": [
+    "surface 选择为 certman-mcp",
+    "包含 uv run certman-mcp --endpoint http://127.0.0.1:8000 启动命令",
+    "提及 CERTMAN_MCP_TOKEN 环境变量注入方式"
+  ],
+  "focus": "MCP surface 选择与环境变量鉴权配置",
+  "scenario_type": "mcp-integration"
+}

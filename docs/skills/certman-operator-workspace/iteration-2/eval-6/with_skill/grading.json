@@ -1,0 +1,20 @@
+{
+  "run_id": "eval-6-with_skill",
+  "expectations": [
+    {
+      "text": "识别参数缺失为 ValidationError",
+      "passed": true,
+      "evidence": "result.error.type=ValidationError，message 含 entry_name 缺失"
+    },
+    {
+      "text": "给出 cert list 命令帮助确认 entry 名",
+      "passed": true,
+      "evidence": "commands 第一条为 cert list"
+    },
+    {
+      "text": "给出补全参数后的正确 cert renew 命令",
+      "passed": true,
+      "evidence": "commands 第二条为 cert renew --entry-name"
+    }
+  ]
+}

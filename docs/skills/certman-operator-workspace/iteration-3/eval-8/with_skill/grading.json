@@ -1,0 +1,26 @@
+{
+  "eval_id": 8,
+  "mode": "with_skill",
+  "assertions": [
+    {
+      "id": 1,
+      "text": "先执行 cert list 再执行 cert get",
+      "pass": true,
+      "reason": "step=1 执行 cert list，step=2 执行 cert get，顺序正确"
+    },
+    {
+      "id": 2,
+      "text": "cert get 命令包含 --entry-name site-a",
+      "pass": true,
+      "reason": "step2.commands[0] 包含 cert get --entry-name site-a"
+    },
+    {
+      "id": 3,
+      "text": "两步输出均含 result.data 字段",
+      "pass": true,
+      "reason": "step1.result.data 为含3条记录的数组；step2.result.data 为 site-a 的完整详情对象，均非空"
+    }
+  ],
+  "passed": 3,
+  "total": 3
+}

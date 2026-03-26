@@ -1,0 +1,20 @@
+{
+  "run_id": "eval-5-with_skill",
+  "expectations": [
+    {
+      "text": "识别错误类型为 TimeoutError",
+      "passed": true,
+      "evidence": "result.error.type=TimeoutError"
+    },
+    {
+      "text": "给出 job get 查询当前状态的命令",
+      "passed": true,
+      "evidence": "commands 第一条为 job get"
+    },
+    {
+      "text": "提供 --max-wait 参数使用建议",
+      "passed": true,
+      "evidence": "commands 第二条含 --max-wait 600"
+    }
+  ]
+}

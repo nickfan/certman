@@ -1,0 +1,26 @@
+{
+  "surface": "certmanctl",
+  "action": "webhook create and verify",
+  "inputs": {
+    "server": "http://127.0.0.1:8000",
+    "topic": "cert.created",
+    "url": "https://hooks.example.com/notify",
+    "secret": "wh-secret-xyz"
+  },
+  "result": {
+    "status": "success",
+    "id": "wh-xxxxxxxx",
+    "topic": "cert.created",
+    "url": "https://hooks.example.com/notify",
+    "status_field": "active",
+    "created_at": "2026-03-26T00:00:00Z"
+  },
+  "commands": [
+    "certmanctl --server http://127.0.0.1:8000 webhook create --topic cert.created --url https://hooks.example.com/notify --secret wh-secret-xyz",
+    "certmanctl --server http://127.0.0.1:8000 webhook list"
+  ],
+  "next_steps": [
+    "webhook 已创建，可通过 webhook get <id> 查看详情",
+    "密钥 wh-secret-xyz 不会在 get/list 响应中明文返回，以 status:active 及 id 存在为验证依据"
+  ]
+}

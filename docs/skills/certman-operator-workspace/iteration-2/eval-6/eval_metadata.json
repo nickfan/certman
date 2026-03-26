@@ -1,0 +1,10 @@
+{
+  "eval_id": 6,
+  "eval_name": "missing-entry-param",
+  "prompt": "帮我给证书续签，但我只知道控制面地址是 http://127.0.0.1:8000，entry 名字我忘了。",
+  "assertions": [
+    "识别参数缺失为 ValidationError",
+    "给出 cert list 命令帮助确认 entry 名",
+    "给出补全参数后的正确 cert renew 命令"
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "surface": "certman-mcp",
+  "action": "mcp-server-setup",
+  "inputs": {
+    "endpoint": "http://127.0.0.1:8000",
+    "token": "jwt-abc",
+    "integration_target": "Claude Desktop"
+  },
+  "result": {
+    "status": "ready",
+    "data": {
+      "mcp_server": {
+        "startup_command": "CERTMAN_MCP_TOKEN=jwt-abc uv run certman-mcp --endpoint http://127.0.0.1:8000",
+        "description": "certman-mcp 以 stdio 模式启动，进程生命周期由 Claude Desktop 管理"
+      },
+      "claude_desktop_config": {
+        "mcpServers": {
+          "certman": {
+            "command": "uv",
+            "args": ["run", "certman-mcp", "--endpoint", "http://127.0.0.1:8000"],
+            "env": {
+              "CERTMAN_MCP_TOKEN": "jwt-abc"
+            }
+          }
+        }
+      }
+    },
+    "error": {
+      "type": null,
+      "message": null,
+      "raw": null
+    }
+  },
+  "commands": [
+    "CERTMAN_MCP_TOKEN=jwt-abc uv run certman-mcp --endpoint http://127.0.0.1:8000"
+  ],
+  "next_steps": [
+    "将 mcpServers 配置片段合并到 Claude Desktop 配置文件（macOS: ~/Library/Application Support/Claude/claude_desktop_config.json；Windows: %APPDATA%\\Claude\\claude_desktop_config.json）",
+    "重启 Claude Desktop，确认左下角 MCP 工具图标出现",
+    "在对话中确认 certman 工具集（health、cert_list 等）已注册",
+    "执行 health 工具做一次连通性探活，验证 endpoint 与 CERTMAN_MCP_TOKEN 均正确"
+  ]
+}

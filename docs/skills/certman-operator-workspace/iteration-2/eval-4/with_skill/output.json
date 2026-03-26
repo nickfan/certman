@@ -1,0 +1,26 @@
+{
+  "surface": "certmanctl",
+  "action": "诊断 401 Unauthorized 并提供认证修复方案",
+  "inputs": {
+    "endpoint": "http://10.0.0.1:8000",
+    "error_code": "401"
+  },
+  "result": {
+    "status": "failed",
+    "data": null,
+    "error": {
+      "type": "ApiError",
+      "message": "控制面返回 401 Unauthorized，缺少或无效的 Bearer token",
+      "raw": "401 Unauthorized"
+    }
+  },
+  "commands": [
+    "uv run certmanctl --endpoint http://10.0.0.1:8000 --token <your_jwt_token> health",
+    "uv run certmanctl --endpoint http://10.0.0.1:8000 --token <your_jwt_token> cert list"
+  ],
+  "next_steps": [
+    "方式1：每次调用附加 --token 参数",
+    "方式2：设置环境变量 CERTMAN_MCP_TOKEN=<token>，certmanctl 会自动读取",
+    "验证：uv run certmanctl --endpoint http://10.0.0.1:8000 --token <token> health"
+  ]
+}

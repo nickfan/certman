@@ -1,0 +1,36 @@
+{
+  "surface": "certmanctl",
+  "action": "webhook create and verify",
+  "inputs": {
+    "endpoint": "http://127.0.0.1:8000",
+    "topic": "cert.created",
+    "endpoint_url": "https://hooks.example.com/notify",
+    "secret": "wh-secret-xyz"
+  },
+  "result": {
+    "status": "success",
+    "data": {
+      "id": "wh-20260326-001",
+      "topic": "cert.created",
+      "endpoint_url": "https://hooks.example.com/notify",
+      "status": "active",
+      "created_at": "2026-03-26T00:00:00Z",
+      "verified": true
+    },
+    "error": {
+      "type": null,
+      "message": null,
+      "raw": null
+    }
+  },
+  "commands": [
+    "uv run certmanctl --endpoint http://127.0.0.1:8000 webhook create --topic cert.created --endpoint-url https://hooks.example.com/notify --secret wh-secret-xyz",
+    "uv run certmanctl --endpoint http://127.0.0.1:8000 webhook get --id wh-20260326-001"
+  ],
+  "next_steps": [
+    "webhook 已成功创建，id 为 wh-20260326-001，当前状态 active",
+    "已通过 webhook get 确认记录存在且字段正确，验证生效",
+    "当系统触发 cert.created 事件时，将使用密钥 wh-secret-xyz 签名并向 https://hooks.example.com/notify 发送回调",
+    "如需查看所有 webhook：uv run certmanctl --endpoint http://127.0.0.1:8000 webhook list"
+  ]
+}

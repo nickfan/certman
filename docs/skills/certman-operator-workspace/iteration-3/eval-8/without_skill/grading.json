@@ -1,0 +1,26 @@
+{
+  "eval_id": 8,
+  "mode": "without_skill",
+  "assertions": [
+    {
+      "id": 1,
+      "text": "先执行 cert list 再执行 cert get",
+      "pass": true,
+      "reason": "两步顺序正确，step1 cert list，step2 cert get"
+    },
+    {
+      "id": 2,
+      "text": "cert get 命令包含 --entry-name site-a",
+      "pass": false,
+      "reason": "baseline 猜测的参数名为 --name，正确应为 --entry-name；certman 特有参数约定无法从通用背景推断"
+    },
+    {
+      "id": 3,
+      "text": "两步输出均含 result.data 字段",
+      "pass": false,
+      "reason": "baseline 未遵循 certman 统一输出 envelope 格式，step1.result 直接为 certs 数组，step2.result 为 cert 对象，均缺少 data 字段包装"
+    }
+  ],
+  "passed": 1,
+  "total": 3
+}

@@ -33,6 +33,72 @@
         "解释 0/10/20/30",
         "基于退出码给出续签决策"
       ]
+    },
+    {
+      "id": 4,
+      "prompt": "certmanctl 调用控制面返回 401 Unauthorized，请告诉我是什么问题，并给出带 token 的正确调用方式，endpoint 是 http://10.0.0.1:8000。",
+      "expected_output": "识别为 ApiError/鉴权失败，给出 --token 参数的正确用法，并说明如何通过环境变量 CERTMAN_MCP_TOKEN 注入。",
+      "files": [],
+      "assertions": [
+        "识别错误类型为 ApiError（HTTP 401）",
+        "给出带 --token 的命令示例",
+        "提及环境变量注入方式"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "job wait 等了很久没有收到终态，endpoint 是 http://127.0.0.1:8000，job-id 是 j-xyz-789。帮我分析是什么情况，下一步怎么做。",
+      "expected_output": "识别为 TimeoutError，建议检查 job 当前状态（job get），并推荐调整 --max-wait 参数重试或手动干预。",
+      "files": [],
+      "assertions": [
+        "识别错误类型为 TimeoutError",
+        "给出 job get 查询当前状态的命令",
+        "提供 --max-wait 参数使用建议"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "帮我给证书续签，但我只知道控制面地址是 http://127.0.0.1:8000，entry 名字我忘了。",
+      "expected_output": "识别为 ValidationError（entry 缺失），建议先用 cert list 获取全部 entry，然后用 cert renew --entry-name 执行续签。",
+      "files": [],
+      "assertions": [
+        "识别参数缺失为 ValidationError",
+        "给出 cert list 命令帮助确认 entry 名",
+        "给出补全参数后的正确 cert renew 命令"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "我想把 CertMan 以 MCP 方式接入 Claude Desktop，控制面地址是 http://127.0.0.1:8000，请告诉我如何启动 MCP server，以及 Claude Desktop 的配置方式，token 是 jwt-abc。",
+      "expected_output": "surface 为 certman-mcp，给出 uv run certman-mcp --endpoint 启动命令，说明 CERTMAN_MCP_TOKEN 注入方式，并提供 Claude Desktop mcpServers 配置片段。",
+      "files": [],
+      "assertions": [
+        "surface 选择为 certman-mcp",
+        "包含 uv run certman-mcp --endpoint http://127.0.0.1:8000 启动命令",
+        "提及 CERTMAN_MCP_TOKEN 环境变量注入方式"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "控制面在 http://127.0.0.1:8000，先列出当前所有证书，然后查看 site-a 的详情。",
+      "expected_output": "先执行 certmanctl cert list，再执行 certmanctl cert get --entry-name site-a，结构化输出两步结果，result.data 非空。",
+      "files": [],
+      "assertions": [
+        "先执行 cert list 再执行 cert get",
+        "cert get 命令包含 --entry-name site-a",
+        "两步输出均含 result.data 字段"
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "在控制面 http://127.0.0.1:8000 创建一个 webhook：topic 是 cert.created，回调地址是 https://hooks.example.com/notify，密钥是 wh-secret-xyz，创建后验证已生效。",
+      "expected_output": "使用 webhook create 传入 topic/endpoint-url/secret，然后用 webhook get 或 webhook list 验证，输出含新 webhook 的 id 和 status。",
+      "files": [],
+      "assertions": [
+        "使用 webhook create 且包含 --topic cert.created --endpoint-url https://hooks.example.com/notify --secret wh-secret-xyz",
+        "创建后执行 webhook get 或 webhook list 验证",
+        "输出中含 webhook id 字段"
+      ]
     }
   ]
 }

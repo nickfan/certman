@@ -1,0 +1,13 @@
+{
+  "eval_id": 8,
+  "eval_name": "cert-list-and-get",
+  "iteration": 3,
+  "prompt": "控制面在 http://127.0.0.1:8000，先列出当前所有证书，然后查看 site-a 的详情。",
+  "assertions": [
+    "先执行 cert list 再执行 cert get",
+    "cert get 命令包含 --entry-name site-a",
+    "两步输出均含 result.data 字段"
+  ],
+  "focus": "多步查询流程与 result.data 字段完整性",
+  "scenario_type": "query-flow"
+}

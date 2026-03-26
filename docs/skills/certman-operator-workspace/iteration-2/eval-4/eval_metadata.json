@@ -1,0 +1,10 @@
+{
+  "eval_id": 4,
+  "eval_name": "auth-failure-401",
+  "prompt": "certmanctl 调用控制面返回 401 Unauthorized，请告诉我是什么问题，并给出带 token 的正确调用方式，endpoint 是 http://10.0.0.1:8000。",
+  "assertions": [
+    "识别错误类型为 ApiError（HTTP 401）",
+    "给出带 --token 的命令示例",
+    "提及环境变量注入方式"
+  ]
+}

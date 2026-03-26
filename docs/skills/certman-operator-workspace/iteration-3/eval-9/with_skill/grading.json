@@ -1,0 +1,26 @@
+{
+  "eval_id": 9,
+  "mode": "with_skill",
+  "assertions": [
+    {
+      "id": 1,
+      "text": "使用 webhook create 包含正确参数",
+      "pass": true,
+      "reason": "commands[0] 包含 webhook create --topic cert.created --endpoint-url https://hooks.example.com/notify --secret wh-secret-xyz，全部必需参数正确"
+    },
+    {
+      "id": 2,
+      "text": "创建后执行 webhook get 或 webhook list 验证",
+      "pass": true,
+      "reason": "commands[1] 执行了 webhook get --id wh-20260326-001，在创建后对返回 id 进行了验证查询"
+    },
+    {
+      "id": 3,
+      "text": "输出中含 webhook id 字段",
+      "pass": true,
+      "reason": "result.data.id = wh-20260326-001，id 字段存在且非空"
+    }
+  ],
+  "passed": 3,
+  "total": 3
+}

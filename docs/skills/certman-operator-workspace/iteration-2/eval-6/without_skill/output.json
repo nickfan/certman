@@ -1,0 +1,18 @@
+{
+  "eval_id": 6,
+  "task_type": "baseline",
+  "surface": "certman-ctl",
+  "action": "cert_renew",
+  "inputs": {"control_plane_url": "http://127.0.0.1:8000", "entry_name": null},
+  "result": {
+    "status": "ValidationError",
+    "error": "缺少参数 entry_name"
+  },
+  "commands": [
+    "certman-ctl cert list --url http://127.0.0.1:8000",
+    "certman-ctl cert renew --url http://127.0.0.1:8000 --entry <entry_name>"
+  ],
+  "next_steps": [
+    "使用 cert list 获取 entry 后执行 renew"
+  ]
+}

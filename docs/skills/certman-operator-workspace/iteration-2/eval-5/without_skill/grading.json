@@ -1,0 +1,20 @@
+{
+  "run_id": "eval-5-without_skill",
+  "expectations": [
+    {
+      "text": "识别错误类型为 TimeoutError",
+      "passed": false,
+      "evidence": "未使用统一枚举，罗列了多种可能原因"
+    },
+    {
+      "text": "给出 job get 查询当前状态的命令",
+      "passed": false,
+      "evidence": "使用了 curl + REST path，而非 certmanctl job get"
+    },
+    {
+      "text": "提供 --max-wait 参数使用建议",
+      "passed": false,
+      "evidence": "无 --max-wait 参数建议"
+    }
+  ]
+}

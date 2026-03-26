@@ -1,0 +1,20 @@
+{
+  "run_id": "eval-4-with_skill",
+  "expectations": [
+    {
+      "text": "识别错误类型为 ApiError（HTTP 401）",
+      "passed": true,
+      "evidence": "result.error.type=ApiError，message 含 401"
+    },
+    {
+      "text": "给出带 --token 的命令示例",
+      "passed": true,
+      "evidence": "commands 中含 --token 参数"
+    },
+    {
+      "text": "提及环境变量注入方式",
+      "passed": true,
+      "evidence": "next_steps 中含 CERTMAN_MCP_TOKEN 字样"
+    }
+  ]
+}

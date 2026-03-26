@@ -1,0 +1,26 @@
+{
+  "eval_id": 9,
+  "mode": "without_skill",
+  "assertions": [
+    {
+      "id": 1,
+      "text": "使用 webhook create 包含正确参数",
+      "pass": false,
+      "reason": "baseline 猜用了 --url 而非 --endpoint-url，参数名与 certman CLI 约定不符；certman 特有参数名无法从通用背景推断"
+    },
+    {
+      "id": 2,
+      "text": "创建后执行 webhook get 或 webhook list 验证",
+      "pass": true,
+      "reason": "commands[1] 明确使用 webhook list 验证，并提示可用 webhook get <id> 替代，满足断言"
+    },
+    {
+      "id": 3,
+      "text": "输出中含 webhook id 字段",
+      "pass": true,
+      "reason": "result.id = wh-xxxxxxxx，id 字段存在（占位符形式，但字段本身存在）"
+    }
+  ],
+  "passed": 2,
+  "total": 3
+}

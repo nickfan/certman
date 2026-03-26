@@ -1,0 +1,54 @@
+{
+  "skill_name": "certman-operator",
+  "iteration": 2,
+  "scope": "edge cases: auth failure / timeout / missing param",
+  "summary": {
+    "with_skill": {
+      "passed_assertions": 9,
+      "total_assertions": 9,
+      "pass_rate": 1.0,
+      "avg_tokens": null,
+      "avg_duration_seconds": null
+    },
+    "without_skill": {
+      "passed_assertions": 3,
+      "total_assertions": 9,
+      "pass_rate": 0.3333,
+      "avg_tokens": null,
+      "avg_duration_seconds": null
+    },
+    "delta": {
+      "pass_rate": 0.6667,
+      "tokens": null,
+      "duration_seconds": null
+    }
+  },
+  "per_eval": [
+    {
+      "eval_id": 4,
+      "eval_name": "auth-failure-401",
+      "with_skill": {"passed_assertions": 3, "total_assertions": 3, "pass_rate": 1.0},
+      "without_skill": {"passed_assertions": 1, "total_assertions": 3, "pass_rate": 0.3333},
+      "notes": "baseline 在环境变量名上与约定不符（CERTMAN_API_TOKEN vs CERTMAN_MCP_TOKEN）"
+    },
+    {
+      "eval_id": 5,
+      "eval_name": "job-wait-timeout",
+      "with_skill": {"passed_assertions": 3, "total_assertions": 3, "pass_rate": 1.0},
+      "without_skill": {"passed_assertions": 0, "total_assertions": 3, "pass_rate": 0.0},
+      "notes": "baseline 使用了 curl REST 调用，未使用 certmanctl 且无 --max-wait 建议"
+    },
+    {
+      "eval_id": 6,
+      "eval_name": "missing-entry-param",
+      "with_skill": {"passed_assertions": 3, "total_assertions": 3, "pass_rate": 1.0},
+      "without_skill": {"passed_assertions": 1, "total_assertions": 3, "pass_rate": 0.3333},
+      "notes": "baseline 工具名为 certman-ctl 且参数为 --url，非 certmanctl + --endpoint"
+    }
+  ],
+  "notes": [
+    "passed/total 统计口径为断言数，不是重复运行次数。",
+    "本轮聚焦异常路径，补充 iteration-1 中未覆盖的 auth/timeout/param 分支。",
+    "with_skill 在三个异常场景均全通过，baseline 受工具面漂移影响明显。"
+  ]
+}

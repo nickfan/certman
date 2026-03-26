@@ -1,6 +1,5 @@
 ---
-name: certman-operator
-description: 使用 CertMan 进行证书运维自动化（local CLI、control-plane CLI、MCP）。当用户提到 certman、证书签发/续签、job wait、webhook 管理、控制面 health、OpenAPI、MCP 工具接入时，必须优先使用本技能；即使用户没有明确说“skill”，只要需求涉及 CertMan 运维流程或接口编排，也应主动触发。
+name: certman-operatorversion: v4description: 使用 CertMan 进行证书运维自动化（local CLI、control-plane CLI、MCP）。当用户提到 certman、证书签发/续签、job wait、webhook 管理、控制面 health、OpenAPI、MCP 工具接入时，必须优先使用本技能；即使用户没有明确说“skill”，只要需求涉及 CertMan 运维流程或接口编排，也应主动触发。
 ---
 
 # CertMan Operator Skill
@@ -39,6 +38,11 @@ description: 使用 CertMan 进行证书运维自动化（local CLI、control-pl
 3. 仅本机维护：`certman`
 4. 需要强类型接口编排：OpenAPI + REST
 
+> **执行面全局参数约定（禁止猜测！）**
+> - `certmanctl` 远程地址参数：`--endpoint <url>`（不是 `--server` / `--url`）
+> - `certmanctl` 鉴权参数：`--token <jwt>`（不是 `--auth` / `--api-key`）
+> - 所有入口命令前缀：`uv run certmanctl` / `uv run certman` / `uv run certman-mcp`
+
 ## 执行前检查（Preflight）
 
 每次执行前至少做这些检查：
@@ -50,6 +54,10 @@ description: 使用 CertMan 进行证书运维自动化（local CLI、control-pl
 - limit 范围 1-200
 4. 可用性探活（remote）：
 - `uv run certmanctl --endpoint <url> health`
+5. 鉴权（有 token 保护时）：
+   - `--token` 参数：`uv run certmanctl --endpoint <url> --token <jwt> health`
+   - 环境变量：`CERTMAN_MCP_TOKEN=<jwt> uv run certmanctl ...`（certmanctl 自动读取此变量）
+   - MCP server 同样从环境变量 `CERTMAN_MCP_TOKEN` 读取 token
 
 若探活失败：
 
@@ -61,6 +69,11 @@ description: 使用 CertMan 进行证书运维自动化（local CLI、control-pl
 ## 命令映射
 
 详细参数表见：`references/command-map.md`。
+
+> **关键参数名约束（常见 baseline 错误，必须遵循）**
+> - 证书操作用 `--entry-name`，不是 `--name` / `--cert`
+> - webhook 回调地址用 `--endpoint-url`，不是 `--url` / `--callback`
+> - MCP server 启动：`uv run certman-mcp --endpoint <url>`，不接受 `serve` 子命令
 
 最常见流程：
 
@@ -77,12 +90,25 @@ description: 使用 CertMan 进行证书运维自动化（local CLI、control-pl
 - `check --json`
 - 根据 exit code 决定是否 renew
 
+4. 参数缺失补全
+- 先 `cert list` 查询可用 entry
+- 确认后执行 `cert renew --entry-name <entry>`
+
+5. 鉴权失败修复（401）
+- 从管理员获取 JWT token
+- 通过 `--token` 传递或设置 `CERTMAN_MCP_TOKEN` 环境变量
+- 重新执行原命令
+
+6. timeout 恢复
+- 先 `job get` 查询当前状态
+- 若仍 running：`job wait --max-wait 600`（秒）重试
+
 ## 错误分层
 
-- `TransportError`：网络不可达、连接失败
-- `ApiError`：控制面业务错误
-- `TimeoutError`：等待终态超时
-- `ValidationError`：参数缺失或不合法
+- `TransportError`：网络不可达、连接失败（HTTP 连接层）
+- `ApiError`：控制面业务错误，含 401 鉴权失败、404 资源不存在、500 内部错误
+- `TimeoutError`：等待终态超时（job wait 超过 --max-wait）
+- `ValidationError`：参数缺失或不合法（如 entry_name 为空）
 
 关键退出码：
 
@@ -146,6 +172,26 @@ description: 使用 CertMan 进行证书运维自动化（local CLI、control-pl
 7. `job wait` 场景必须显式给出超时语义和失败分类。
 
 ## 示例
+
+### 示例 0：MCP 接入 Claude Desktop
+
+输入意图：
+- "把 CertMan 接入 Claude Desktop，endpoint 是 http://127.0.0.1:8000，token 是 jwt-abc"
+
+推荐执行：
+1. 启动命令：`CERTMAN_MCP_TOKEN=jwt-abc uv run certman-mcp --endpoint http://127.0.0.1:8000`
+2. Claude Desktop 配置（`claude_desktop_config.json`）：
+```json
+{
+  "mcpServers": {
+    "certman": {
+      "command": "uv",
+      "args": ["run", "certman-mcp", "--endpoint", "http://127.0.0.1:8000"],
+      "env": { "CERTMAN_MCP_TOKEN": "jwt-abc" }
+    }
+  }
+}
+```
 
 ### 示例 1：签发并等待
 

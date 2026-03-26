@@ -1,0 +1,26 @@
+{
+  "surface": "certmanctl",
+  "action": "Analyze job wait timeout and provide recovery steps",
+  "inputs": {
+    "endpoint": "http://127.0.0.1:8000",
+    "job_id": "j-xyz-789"
+  },
+  "result": {
+    "status": "failed",
+    "data": null,
+    "error": {
+      "type": "TimeoutError",
+      "message": "job wait exceeded default timeout without reaching terminal state",
+      "raw": "Job j-xyz-789 did not complete within the default wait period"
+    }
+  },
+  "commands": [
+    "uv run certmanctl --endpoint http://127.0.0.1:8000 job get --job-id j-xyz-789",
+    "uv run certmanctl --endpoint http://127.0.0.1:8000 job wait --job-id j-xyz-789 --max-wait 600"
+  ],
+  "next_steps": [
+    "用 job get 查询当前状态确认是否仍在 running",
+    "若仍运行中，使用 --max-wait 600 重试等待",
+    "若 job 已失败，查看错误并决定重新触发"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "eval_id": "4",
+  "task_type": "baseline",
+  "problem_analysis": {
+    "error": "401 Unauthorized",
+    "root_cause": "缺少认证 token"
+  },
+  "solution": {
+    "cli_example": "certmanctl --endpoint http://10.0.0.1:8000 --token <your-jwt-token> <command>",
+    "env_var_example": "export CERTMAN_API_TOKEN=<your-jwt-token> && certmanctl ..."
+  },
+  "recommendations": [
+    "检查环境变量 CERTMAN_API_TOKEN",
+    "确认 token 未过期"
+  ]
+}

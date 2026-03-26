@@ -1,0 +1,26 @@
+{
+  "eval_id": 7,
+  "mode": "without_skill",
+  "assertions": [
+    {
+      "id": 1,
+      "text": "surface 选择为 certman-mcp",
+      "pass": true,
+      "reason": "背景信息明确提及 certman-mcp，baseline 正确识别并选用该 surface"
+    },
+    {
+      "id": 2,
+      "text": "包含 uv run certman-mcp --endpoint 启动命令",
+      "pass": false,
+      "reason": "baseline 生成的命令为 certman-mcp serve --endpoint，既未使用 uv run，也使用了不存在的 serve 子命令"
+    },
+    {
+      "id": 3,
+      "text": "提及 CERTMAN_MCP_TOKEN 环境变量注入方式",
+      "pass": false,
+      "reason": "baseline 猜测的环境变量名为 CERTMAN_TOKEN，而非正确的 CERTMAN_MCP_TOKEN"
+    }
+  ],
+  "passed": 1,
+  "total": 3
+}

@@ -1,0 +1,18 @@
+{
+  "task_type": "baseline",
+  "eval_id": 5,
+  "analysis": {
+    "possible_causes": [
+      "API endpoint 不可达",
+      "Job 执行卡住",
+      "状态回调失败"
+    ]
+  },
+  "recommendations": {
+    "immediate_actions": [
+      {"step": 1, "command": "kubectl -n certman-lab port-forward svc/certman-server 8001:8000"},
+      {"step": 2, "command": "curl http://127.0.0.1:8000/health"},
+      {"step": 3, "command": "curl http://127.0.0.1:8000/api/jobs/j-xyz-789"}
+    ]
+  }
+}

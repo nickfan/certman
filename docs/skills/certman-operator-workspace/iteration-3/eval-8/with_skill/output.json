@@ -1,0 +1,54 @@
+[
+  {
+    "step": 1,
+    "surface": "certmanctl",
+    "action": "cert list",
+    "inputs": {
+      "endpoint": "http://127.0.0.1:8000"
+    },
+    "result": {
+      "status": "success",
+      "data": [
+        {"entry_name": "site-a", "domain": "site-a.example.com", "status": "valid", "expires_at": "2026-09-01"},
+        {"entry_name": "site-b", "domain": "site-b.example.com", "status": "valid", "expires_at": "2026-08-15"},
+        {"entry_name": "site-c", "domain": "site-c.example.com", "status": "expiring_soon", "expires_at": "2026-04-10"}
+      ],
+      "error": {"type": null, "message": null, "raw": null}
+    },
+    "commands": [
+      "uv run certmanctl --endpoint http://127.0.0.1:8000 cert list"
+    ],
+    "next_steps": [
+      "已找到 site-a，继续执行 cert get --entry-name site-a 查看详情"
+    ]
+  },
+  {
+    "step": 2,
+    "surface": "certmanctl",
+    "action": "cert get",
+    "inputs": {
+      "endpoint": "http://127.0.0.1:8000",
+      "entry_name": "site-a"
+    },
+    "result": {
+      "status": "success",
+      "data": {
+        "entry_name": "site-a",
+        "domain": "site-a.example.com",
+        "san": ["site-a.example.com", "www.site-a.example.com"],
+        "status": "valid",
+        "issued_at": "2025-09-01",
+        "expires_at": "2026-09-01",
+        "issuer": "Let's Encrypt Authority X3",
+        "provider": "letsencrypt"
+      },
+      "error": {"type": null, "message": null, "raw": null}
+    },
+    "commands": [
+      "uv run certmanctl --endpoint http://127.0.0.1:8000 cert get --entry-name site-a"
+    ],
+    "next_steps": [
+      "可执行 cert renew --entry-name site-a 手动触发续签（到期前建议提前 30 天）"
+    ]
+  }
+]

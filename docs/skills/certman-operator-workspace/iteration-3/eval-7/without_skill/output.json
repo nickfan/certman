@@ -1,0 +1,32 @@
+{
+  "surface": "certman-mcp",
+  "action": "启动 MCP server 并接入 Claude Desktop",
+  "inputs": {
+    "endpoint": "http://127.0.0.1:8000",
+    "token": "jwt-abc"
+  },
+  "result": "通过 certman-mcp 暴露 MCP 协议接口，供 Claude Desktop 以工具调用方式管理证书",
+  "commands": [
+    "certman-mcp serve --endpoint http://127.0.0.1:8000 --token jwt-abc",
+    "CERTMAN_TOKEN=jwt-abc certman-mcp serve --endpoint http://127.0.0.1:8000"
+  ],
+  "claude_desktop_config": {
+    "path": "~/Library/Application Support/Claude/claude_desktop_config.json（macOS）",
+    "example": {
+      "mcpServers": {
+        "certman": {
+          "command": "certman-mcp",
+          "args": ["serve", "--endpoint", "http://127.0.0.1:8000"],
+          "env": {
+            "CERTMAN_TOKEN": "jwt-abc"
+          }
+        }
+      }
+    }
+  },
+  "next_steps": [
+    "确认 certman-mcp 已安装：pip show certman-mcp 或 certman-mcp --version",
+    "启动 MCP server 后在 Claude Desktop 中重启以加载配置",
+    "验证工具列表中出现 certman 相关工具"
+  ]
+}

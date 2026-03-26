@@ -1,0 +1,25 @@
+{
+  "surface": "certmanctl",
+  "action": "cert renew with missing entry (list first)",
+  "inputs": {
+    "endpoint": "http://127.0.0.1:8000",
+    "entry_name": null
+  },
+  "result": {
+    "status": "failed",
+    "data": null,
+    "error": {
+      "type": "ValidationError",
+      "message": "entry_name 参数缺失，无法执行续签",
+      "raw": null
+    }
+  },
+  "commands": [
+    "uv run certmanctl --endpoint http://127.0.0.1:8000 cert list",
+    "uv run certmanctl --endpoint http://127.0.0.1:8000 cert renew --entry-name <entry_name>"
+  ],
+  "next_steps": [
+    "先运行 cert list 查看所有可用 entry",
+    "确认目标 entry 名后替换 <entry_name> 执行 cert renew"
+  ]
+}

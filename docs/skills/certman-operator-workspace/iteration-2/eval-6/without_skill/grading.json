@@ -1,0 +1,20 @@
+{
+  "run_id": "eval-6-without_skill",
+  "expectations": [
+    {
+      "text": "识别参数缺失为 ValidationError",
+      "passed": false,
+      "evidence": "status 字段直接写了 'ValidationError'，但 result.error.type 字段缺失"
+    },
+    {
+      "text": "给出 cert list 命令帮助确认 entry 名",
+      "passed": true,
+      "evidence": "commands 含 cert list"
+    },
+    {
+      "text": "给出补全参数后的正确 cert renew 命令",
+      "passed": false,
+      "evidence": "命令为 certman-ctl（错误工具名）且参数为 --url 而非 --endpoint"
+    }
+  ]
+}

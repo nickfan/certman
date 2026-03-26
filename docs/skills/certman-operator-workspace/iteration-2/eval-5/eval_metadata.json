@@ -1,0 +1,10 @@
+{
+  "eval_id": 5,
+  "eval_name": "job-wait-timeout",
+  "prompt": "job wait 等了很久没有收到终态，endpoint 是 http://127.0.0.1:8000，job-id 是 j-xyz-789。帮我分析是什么情况，下一步怎么做。",
+  "assertions": [
+    "识别错误类型为 TimeoutError",
+    "给出 job get 查询当前状态的命令",
+    "提供 --max-wait 参数使用建议"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "run_id": "eval-4-without_skill",
+  "expectations": [
+    {
+      "text": "识别错误类型为 ApiError（HTTP 401）",
+      "passed": false,
+      "evidence": "没有使用统一错误枚举，只描述了 '401 Unauthorized'"
+    },
+    {
+      "text": "给出带 --token 的命令示例",
+      "passed": true,
+      "evidence": "cli_example 含 --token 字段"
+    },
+    {
+      "text": "提及环境变量注入方式",
+      "passed": false,
+      "evidence": "env_var 使用了 CERTMAN_API_TOKEN，非约定的 CERTMAN_MCP_TOKEN"
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+[
+  {
+    "step": 1,
+    "surface": "certmanctl",
+    "action": "cert list",
+    "inputs": {
+      "server": "http://127.0.0.1:8000"
+    },
+    "commands": [
+      "certmanctl --server http://127.0.0.1:8000 cert list"
+    ],
+    "result": {
+      "status": "success",
+      "certs": ["site-a", "site-b", "site-c"]
+    },
+    "next_steps": [
+      "查看 site-a 详情"
+    ]
+  },
+  {
+    "step": 2,
+    "surface": "certmanctl",
+    "action": "cert get",
+    "inputs": {
+      "server": "http://127.0.0.1:8000",
+      "name": "site-a"
+    },
+    "commands": [
+      "certmanctl --server http://127.0.0.1:8000 cert get --name site-a"
+    ],
+    "result": {
+      "status": "success",
+      "cert": {
+        "name": "site-a",
+        "domain": "site-a.example.com",
+        "expires_at": "2026-09-01"
+      }
+    },
+    "next_steps": []
+  }
+]

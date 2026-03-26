@@ -1,0 +1,26 @@
+{
+  "eval_id": 7,
+  "mode": "with_skill",
+  "assertions": [
+    {
+      "id": 1,
+      "text": "surface 选择为 certman-mcp",
+      "pass": true,
+      "reason": "输出 surface 字段明确赋值为 certman-mcp，SKILL 规则要求用户明确要求 MCP 接入时选择该执行面"
+    },
+    {
+      "id": 2,
+      "text": "包含 uv run certman-mcp --endpoint 启动命令",
+      "pass": true,
+      "reason": "commands[0] 为 CERTMAN_MCP_TOKEN=jwt-abc uv run certman-mcp --endpoint http://127.0.0.1:8000，result.data.mcp_server.startup_command 同样包含完整命令"
+    },
+    {
+      "id": 3,
+      "text": "提及 CERTMAN_MCP_TOKEN 环境变量注入方式",
+      "pass": true,
+      "reason": "在 claude_desktop_config.mcpServers.certman.env.CERTMAN_MCP_TOKEN 和 startup_command 前缀中均体现了两种注入方式"
+    }
+  ],
+  "passed": 3,
+  "total": 3
+}

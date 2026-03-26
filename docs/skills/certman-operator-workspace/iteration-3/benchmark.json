@@ -1,0 +1,71 @@
+{
+  "skill_name": "certman-operator",
+  "iteration": 3,
+  "scope": "new surfaces: MCP setup / cert query flow / webhook create",
+  "summary": {
+    "with_skill": {
+      "passed_assertions": 9,
+      "total_assertions": 9,
+      "pass_rate": 1.0,
+      "avg_tokens": null,
+      "avg_duration_seconds": null
+    },
+    "without_skill": {
+      "passed_assertions": 4,
+      "total_assertions": 9,
+      "pass_rate": 0.4444,
+      "avg_tokens": null,
+      "avg_duration_seconds": null
+    },
+    "delta": {
+      "pass_rate": 0.5556,
+      "tokens": null,
+      "duration_seconds": null
+    }
+  },
+  "per_eval": [
+    {
+      "eval_id": 7,
+      "eval_name": "mcp-server-setup",
+      "with_skill": {"passed_assertions": 3, "total_assertions": 3, "pass_rate": 1.0},
+      "without_skill": {"passed_assertions": 1, "total_assertions": 3, "pass_rate": 0.3333},
+      "notes": "baseline 用了 certman-mcp serve（子命令不存在）+ 环境变量名猜错（CERTMAN_TOKEN vs CERTMAN_MCP_TOKEN）"
+    },
+    {
+      "eval_id": 8,
+      "eval_name": "cert-list-and-get",
+      "with_skill": {"passed_assertions": 3, "total_assertions": 3, "pass_rate": 1.0},
+      "without_skill": {"passed_assertions": 1, "total_assertions": 3, "pass_rate": 0.3333},
+      "notes": "baseline 参数名猜错（--name vs --entry-name），且未遵循 result.data envelope 格式"
+    },
+    {
+      "eval_id": 9,
+      "eval_name": "webhook-create-verify",
+      "with_skill": {"passed_assertions": 3, "total_assertions": 3, "pass_rate": 1.0},
+      "without_skill": {"passed_assertions": 2, "total_assertions": 3, "pass_rate": 0.6667},
+      "notes": "baseline webhook create 参数名猜错（--url vs --endpoint-url），验证流和 id 字段均正确"
+    }
+  ],
+  "cumulative": {
+    "iterations": [1, 2, 3],
+    "with_skill": {
+      "passed_assertions": 27,
+      "total_assertions": 27,
+      "pass_rate": 1.0
+    },
+    "without_skill": {
+      "passed_assertions": 9,
+      "total_assertions": 27,
+      "pass_rate": 0.3333
+    },
+    "delta": {
+      "pass_rate": 0.6667
+    }
+  },
+  "notes": [
+    "passed/total 统计口径为断言数，不是重复运行次数。",
+    "本轮聚焦新执行面（MCP）与查询/创建流程，补充 iteration-1/2 未覆盖的场景。",
+    "with_skill 在全部 9 个场景（3轮共27断言）均全通过，baseline 累计通过率 33.3%。",
+    "baseline 失分主要模式：(1) 工具面参数名漂移（--url/--name/--server vs --endpoint-url/--entry-name/--endpoint），(2) uv run 前缀缺失，(3) 环境变量名猜错。"
+  ]
+}
