@@ -12,53 +12,96 @@
 # - Put secrets in data/conf/.env (optional; see .env.example)
 
 # Runtime mode: "local" | "agent" | "server"
+# Descriptions:
+#   - local: Standalone mode, runs certbot locally. No network communication.
+#   - agent: Worker mode, registers with central server and polls for cert jobs (requires server reachability)
+#   - server: Central API server that dispatches jobs to agents and manages certificate inventory
 run_mode = "local"
 
 [global]
 # Base data directory. In docker-compose, this will be /data.
+# All relative paths below are relative to this directory.
 data_dir = "data"
 
-# ACME server: "staging" or "prod"
+# ACME server: "staging" (for testing) | "prod" (for production)
+# Staging has much higher rate limits but generates untrusted certs.
 acme_server = "staging"
 
-# Certbot registration email
+# Certbot registration email for ACME account creation
+# Used to receive renewal reminders and certificate expiry notifications
 email = "admin@example.com"
 
 # Optional directory overrides (relative to data_dir unless absolute)
+# Customize if you want to mount different volumes in containerized setups
 conf_dir = "conf"
 run_dir = "run"
 log_dir = "log"
 output_dir = "output"
 
 # Where certbot stores its state (relative to run_dir by default)
+# Contains account keys, certificates, and renewal metadata
 letsencrypt_dir = "letsencrypt"
 
 # Scan item configs under data/conf/
-#
+# Each item_*.toml file defines one certificate entry (domain, provider, hooks, etc.)
 # Note: templates use the suffix `.example.toml` and are excluded by default.
 scan_items_glob = "item_*.toml"
 
-# Agent mode example:
+# ============================================================================
+# AGENT MODE CONFIGURATION
+# ============================================================================
+# Use this when run_mode = "agent"
+# Agent registers with a central server and polls for certificate renewal jobs
+#
+# Example:
 # [control_plane]
-# endpoint = "https://certman.example.com"
-# poll_interval_seconds = 30
+#   # Server endpoint (must be reachable from agent)
+#   endpoint = "https://certman.example.com"
+#   # How often to poll for jobs (in seconds)
+#   poll_interval_seconds = 30
 #
 # [node_identity]
-# node_id = "node-a"
-# private_key_path = "run/keys/node-a.pem"
-# public_key_path = "run/keys/node-a.pub"
-# certificate_store_path = "run/certs"
+#   # Unique identifier for this agent node (e.g., "edge-server-1", "aws-us-east-1")
+#   node_id = "node-a"
+#   # Ed25519 private key for signing requests (generated via `certman-agent init`)
+#   private_key_path = "run/keys/node-a.pem"
+#   # Corresponding public key (auto-exported)
+#   public_key_path = "run/keys/node-a.pub"
+#   # Where to store downloaded cert bundles before deployment
+#   certificate_store_path = "run/certs"
+#
+# Environment Variable for First-Start Registration:
+#   CERTMAN_NODE_REGISTRATION_TOKEN=<one-time-token>
+#   This token is used only once during agent's first registration with server.
+#   After successful registration, the node is approved and subsequent polls don't need a token.
 
-# Server mode example:
+# ============================================================================
+# SERVER MODE CONFIGURATION
+# ============================================================================
+# Use this when run_mode = "server"
+# Runs the central API server that agents connect to
+#
+# Example:
 # [server]
-# db_path = "data/run/certman.db"
-# listen_host = "0.0.0.0"
-# listen_port = 8000
-# signing_key_path = "run/keys/server.pem"
+#   # Path to SQLite database (stores nodes, jobs, audit logs)
+#   db_path = "run/certman.db"
+#   # Listen address (use 0.0.0.0 in docker-compose)
+#   listen_host = "0.0.0.0"
+#   listen_port = 8000
+#   # Ed25519 private key for signing job bundles sent to agents
+#   signing_key_path = "run/keys/server.pem"
+#   # Optional: API authentication token (for management endpoints)
+#   # api_token = "..." (not yet implemented)
 
-# Optional hooks (shared by local/agent/server where applicable)
+# ============================================================================
+# OPTIONAL: HOOKS (shared by local/agent/server where applicable)
+# ============================================================================
+# Hooks allow external tooling integration on certificate events
+# Available events: "certificate.issued", "certificate.renewed", "certificate.updated"
+#
+# Example:
 # [[hooks]]
 # name = "reload-nginx"
 # event = "certificate.updated"
 # command = "nginx -s reload"
-# shell = true
+# shell = true  # Run via shell (allows pipes, redirects)

@@ -22,6 +22,25 @@ uv run certman-worker --data-dir data --config-file config.toml --once
 uv run certman-agent --data-dir data --config-file config.toml --once
 ```
 
+## Runtime Dependency Matrix
+
+- `certman` (CLI local mode): no dependency on Kubernetes or Docker; can run directly via Python/uv.
+- `certman-server` + `certman-worker`: no dependency on Kubernetes or Docker; Docker is optional for packaging/deploy.
+- `certman-agent`: no hard dependency on Kubernetes or Docker, but requires reachable control-plane endpoint.
+- `scripts/certman-docker.ps1` / `scripts/certman-docker.sh`: requires Docker engine because they are docker wrappers.
+
+Direct run examples (no k8s/docker required):
+
+```bash
+uv run certman --data-dir data entries
+uv run certman --data-dir data check --warn-days 30 --force-renew-days 7
+```
+
+```powershell
+uv run certman --data-dir data entries
+uv run certman --data-dir data check --warn-days 30 --force-renew-days 7
+```
+
 ## Data layout
 
 Default `--data-dir` is `data/` (configurable).
@@ -98,6 +117,13 @@ docker compose run --rm certman export --all
 
 # 6) start control plane and worker
 docker compose up certman-server certman-worker
+```
+
+Optional scripted e2e validation (compose/k8s):
+
+```bash
+python scripts/e2e-test.py --compose-only
+python scripts/e2e-test.py --k8s-only
 ```
 
 Server API quick checks:

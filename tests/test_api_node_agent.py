@@ -18,7 +18,7 @@ from certman.security.signing import sign_message
 from certman.services.job_service import JobService
 
 
-def _prepare_server_with_node(tmp_path: Path) -> tuple[TestClient, Path, Path]:
+def _prepare_server_with_node(tmp_path: Path, *, node_status: str = "active") -> tuple[TestClient, Path, Path]:
     data_dir = tmp_path / "data"
     conf_dir = data_dir / "conf"
     key_dir = data_dir / "run" / "keys"
@@ -59,7 +59,7 @@ signing_key_path = "data/run/keys/server.pem"
                 node_id="node-a",
                 node_type="agent",
                 public_key=node_public.read_text(encoding="utf-8"),
-                status="active",
+                status=node_status,
             )
         )
         session.commit()
@@ -142,3 +142,164 @@ def test_node_agent_result_updates_job_status_with_signature(tmp_path: Path) -> 
     assert updated is not None
     assert updated.status == "completed"
     assert updated.result == "ok"
+
+
+def test_node_agent_poll_rejects_disabled_node(tmp_path: Path) -> None:
+    client, _, _ = _prepare_server_with_node(tmp_path, node_status="disabled")
+    response = client.post(
+        "/api/v1/node-agent/poll",
+        json={
+            "node_id": "node-a",
+            "timestamp": int(datetime.now(timezone.utc).timestamp()),
+            "nonce": "nonce-disabled",
+            "agent_version": "0.1.0",
+            "signature": "invalid",
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "AUTH_NODE_DISABLED"
+
+
+def test_node_agent_poll_updates_last_seen(tmp_path: Path) -> None:
+    client, node_private_path, db_path = _prepare_server_with_node(tmp_path)
+    private_key = load_ed25519_private_key(node_private_path)
+    timestamp = int(datetime.now(timezone.utc).timestamp())
+    signature = sign_message(
+        private_key,
+        node_id="node-a",
+        timestamp=timestamp,
+        nonce="nonce-last-seen",
+        payload=b"",
+    )
+
+    response = client.post(
+        "/api/v1/node-agent/poll",
+        json={
+            "node_id": "node-a",
+            "timestamp": timestamp,
+            "nonce": "nonce-last-seen",
+            "agent_version": "0.1.0",
+            "signature": signature,
+        },
+    )
+
+    assert response.status_code == 200
+
+    session_factory = make_session_factory(db_path)
+    with session_factory() as session:
+        node = session.query(NodeORM).filter(NodeORM.node_id == "node-a").first()
+        assert node is not None
+        assert node.last_seen is not None
+
+
+def test_node_agent_poll_rejects_pending_node(tmp_path: Path) -> None:
+    client, _, _ = _prepare_server_with_node(tmp_path, node_status="pending")
+    response = client.post(
+        "/api/v1/node-agent/poll",
+        json={
+            "node_id": "node-a",
+            "timestamp": int(datetime.now(timezone.utc).timestamp()),
+            "nonce": "nonce-pending",
+            "agent_version": "0.1.0",
+            "signature": "invalid",
+        },
+    )
+
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "AUTH_NODE_NOT_APPROVED"
+
+
+def test_node_agent_poll_throttles_last_seen_updates(tmp_path: Path) -> None:
+    """Test that last_seen updates are throttled to 45s window to reduce write pressure."""
+    from datetime import timedelta
+    
+    client, node_private, db_path = _prepare_server_with_node(tmp_path)
+    
+    # First poll: last_seen_updated_at should be set
+    ts1 = int(datetime.now(timezone.utc).timestamp())
+    sig1 = sign_message(
+        load_ed25519_private_key(node_private),
+        node_id="node-a",
+        timestamp=ts1,
+        nonce="nonce-throttle-1",
+        payload=b"",
+    )
+    response1 = client.post(
+        "/api/v1/node-agent/poll",
+        json={
+            "node_id": "node-a",
+            "timestamp": ts1,
+            "nonce": "nonce-throttle-1",
+            "agent_version": "0.1.0",
+            "signature": sig1,
+        },
+    )
+    assert response1.status_code == 200
+    
+    # Check first update was recorded
+    session_factory = make_session_factory(db_path)
+    with session_factory() as session:
+        node = session.query(NodeORM).filter(NodeORM.node_id == "node-a").first()
+        first_last_seen = node.last_seen
+        first_updated_at = node.last_seen_updated_at
+        assert first_last_seen is not None
+        assert first_updated_at is not None
+    
+    # Second poll within throttle window (10s later): should NOT update last_seen_updated_at
+    ts2 = int(datetime.now(timezone.utc).timestamp())
+    sig2 = sign_message(
+        load_ed25519_private_key(node_private),
+        node_id="node-a",
+        timestamp=ts2,
+        nonce="nonce-throttle-2",
+        payload=b"",
+    )
+    response2 = client.post(
+        "/api/v1/node-agent/poll",
+        json={
+            "node_id": "node-a",
+            "timestamp": ts2,
+            "nonce": "nonce-throttle-2",
+            "agent_version": "0.1.0",
+            "signature": sig2,
+        },
+    )
+    assert response2.status_code == 200
+    
+    # Verify update was throttled (last_seen_updated_at unchanged)
+    with session_factory() as session:
+        node = session.query(NodeORM).filter(NodeORM.node_id == "node-a").first()
+        assert node.last_seen_updated_at == first_updated_at
+    
+    # Third poll outside throttle window: backdate last_seen_updated_at by 60s
+    with session_factory() as session:
+        node = session.query(NodeORM).filter(NodeORM.node_id == "node-a").first()
+        backdated = node.last_seen_updated_at - timedelta(seconds=60)
+        node.last_seen_updated_at = backdated
+        session.commit()
+
+    ts3 = int(datetime.now(timezone.utc).timestamp())
+    sig3 = sign_message(
+        load_ed25519_private_key(node_private),
+        node_id="node-a",
+        timestamp=ts3,
+        nonce="nonce-throttle-3",
+        payload=b"",
+    )
+    response3 = client.post(
+        "/api/v1/node-agent/poll",
+        json={
+            "node_id": "node-a",
+            "timestamp": ts3,
+            "nonce": "nonce-throttle-3",
+            "agent_version": "0.1.0",
+            "signature": sig3,
+        },
+    )
+    assert response3.status_code == 200
+
+    # Verify update occurred after throttle window
+    with session_factory() as session:
+        node = session.query(NodeORM).filter(NodeORM.node_id == "node-a").first()
+        assert node.last_seen_updated_at > first_updated_at

@@ -1,9 +1,30 @@
+# CertMan Multi-Mode Docker Compose Configuration
+#
+# Services:
+#   - certman: Pure local mode (standalone, no networking)
+#   - certman-server: Central API server (agents connect here)
+#   - certman-worker: Job worker (pairs with server, executes queued jobs)
+#   - certman-agent: Agent mode (enabled via --profile agent, polls server for jobs)
+#
+# Quick Start:
+#   1. Local mode only: docker-compose up certman
+#   2. Server + worker: docker-compose up certman-server certman-worker
+#   3. Full cluster: docker-compose --profile agent up
+#
+# Agent Registration (first-time only):
+#   export CERTMAN_NODE_REGISTRATION_TOKEN="<token-from-server-admin>"
+#   docker-compose --profile agent up certman-agent
+
 services:
+  # Local mode: runs certbot directly, no external dependencies
   certman:
     build: .
     entrypoint: ["uv", "run", "certman", "--data-dir", "/data"]
     volumes:
       - ./data:/data
+    profiles: ["local"]
+
+  # Server: Central API that agents register with and poll from
   certman-server:
     build: .
     entrypoint: ["uv", "run", "certman-server", "--data-dir", "/data", "--config-file", "config.compose-server.toml"]
@@ -11,8 +32,24 @@ services:
       - ./data:/data
     ports:
       - "8000:8000"
+
+  # Worker: Executes certificate renewal jobs (must run alongside server)
   certman-worker:
     build: .
     entrypoint: ["uv", "run", "certman-worker", "--data-dir", "/data", "--config-file", "config.compose-server.toml", "--loop", "--interval-seconds", "30"]
     volumes:
       - ./data:/data
+
+  # Agent: Registers with server and polls for certificate jobs
+  # Enable via: docker-compose --profile agent up
+  # Requires: CERTMAN_NODE_REGISTRATION_TOKEN for first-time registration
+  certman-agent:
+    build: .
+    profiles: ["agent"]
+    entrypoint: ["uv", "run", "certman-agent", "--data-dir", "/data", "--config-file", "config.compose-agent.toml", "--once"]
+    volumes:
+      - ./data:/data
+    environment:
+      # One-time registration token (from server admin)
+      # After successful first registration, this is no longer needed
+      CERTMAN_NODE_REGISTRATION_TOKEN: ${CERTMAN_NODE_REGISTRATION_TOKEN:-replace-me}

@@ -1,20 +1,94 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
 import httpx
+from cryptography.hazmat.primitives import serialization
 
 from certman.security.identity import load_ed25519_private_key
 from certman.security.signing import sign_message
 
 
+@dataclass(frozen=True)
+class RegistrationOutcome:
+    """
+    Registration attempt result with failure classification.
+    
+    Attributes:
+        success: True if registration succeeded (agent can now poll)
+        retryable: True if failure is transient (network, server error)
+                  False if failure is permanent (auth, conflict, bad request)
+        code: HTTP status or error code for diagnosis
+        message: Human-readable error description
+    
+    Failure Classification:
+    - Non-retryable (agent should stop): 401 (auth), 403 (forbidden), 409 (conflict), 422 (invalid request)
+    - Retryable (agent should retry): 429 (rate limit), 5xx (server error), network exceptions
+    
+    Exit Code Mapping (for orchestrators):
+    - retryable=true -> exit 3 (k8s restartPolicy: OnFailure will retry)
+    - retryable=false -> exit 2 (k8s restartPolicy: OnFailure won't retry)
+    """
+    success: bool
+    retryable: bool
+    code: str
+    message: str
+
+
 class NodePoller:
-    def __init__(self, *, endpoint: str, node_id: str, private_key_path: str | Path | None = None):
+    """
+    Agent-side orchestrator for server registration and certificate job polling.
+    
+    Startup Flow:
+    1. If register_token is provided:
+       a. Call ensure_registered() to register node with server
+       b. Server returns 200/201 if approved (or duplicate registration)
+       c. On failure: classify error as retryable or permanent
+    2. Once registered (or not needing registration):
+       a. Call poll() to fetch pending certificate jobs
+       b. Sign request with Ed25519 private key for authenticity
+       c. Return list of job assignments
+    
+    Token Handling:
+    - register_token: One-time token for initial registration (env var CERTMAN_NODE_REGISTRATION_TOKEN)
+    - After successful registration, token is no longer needed
+    - Subsequent polls use only node_id + Ed25519 signature for identity
+    
+    Error Handling:
+    - Permanent failures (401, 403, 409, 422): Stop polling, inform orchestrator (exit 2)
+    - Transient failures (429, 5xx, network): Retry later via orchestrator (exit 3)
+    """
+    def __init__(
+        self,
+        *,
+        endpoint: str,
+        node_id: str,
+        private_key_path: str | Path | None = None,
+        public_key_path: str | Path | None = None,
+        node_type: str = "agent",
+        register_token: str | None = None,
+    ):
+        """
+        Initialize agent poller.
+        
+        Args:
+            endpoint: Server base URL (e.g., http://certman-server:8000)
+            node_id: Unique agent identifier (e.g., node-a, edge-us-east-1)
+            private_key_path: Ed25519 private key (auto-generated if missing)
+            public_key_path: Corresponding public key (optional, can be derived)
+            node_type: Label for server records (default: "agent")
+            register_token: One-time registration token (from admin, env: CERTMAN_NODE_REGISTRATION_TOKEN)
+        """
         self._endpoint = endpoint
         self._node_id = node_id
         self._private_key_path = Path(private_key_path) if private_key_path else None
+        self._public_key_path = Path(public_key_path) if public_key_path else None
+        self._node_type = node_type
+        self._register_token = register_token
+        self._last_registration = RegistrationOutcome(success=True, retryable=False, code="REGISTER_NOT_REQUIRED", message="registration not required")
 
     @property
     def endpoint(self) -> str:
@@ -24,8 +98,17 @@ class NodePoller:
     def node_id(self) -> str:
         return self._node_id
 
+    @property
+    def last_registration(self) -> RegistrationOutcome:
+        return self._last_registration
+
     def poll(self) -> list[dict]:
         if self._private_key_path is None or not self._private_key_path.exists():
+            return []
+
+        registration = self.ensure_registered()
+        self._last_registration = registration
+        if not registration.success:
             return []
 
         timestamp = int(datetime.now(timezone.utc).timestamp())
@@ -52,3 +135,70 @@ class NodePoller:
             return response.json().get("data", {}).get("assignments", [])
         except (httpx.HTTPError, ValueError):
             return []
+
+    def ensure_registered(self) -> RegistrationOutcome:
+        """
+        Register agent node with server (first-time only).
+        
+        Workflow:
+        1. If no register_token: Skip registration (assume already registered)
+        2. If private key missing: Return failure (cannot sign requests)
+        3. POST to /api/v1/nodes/register with:
+           - node_id: Unique identifier
+           - public_key: Ed25519 public key (PEM format)
+           - register_token: One-time approval token
+        
+        Server Response Handling:
+        - 200/201: Success (node now approved, no further registration needed)
+        - 401/403: Auth failed (bad token, invalid key format) - non-retryable
+        - 409: Conflict (node_id already registered) - non-retryable
+        - 422: Unprocessable (invalid PEM, non-Ed25519 key) - non-retryable
+        - 429, 5xx: Server issues - retryable
+        
+        Returns:
+            RegistrationOutcome with success/retryable flags and diagnostic info
+        """
+        if not self._register_token:
+            return RegistrationOutcome(success=True, retryable=False, code="REGISTER_NOT_REQUIRED", message="registration not required")
+        if self._private_key_path is None or not self._private_key_path.exists():
+            return RegistrationOutcome(success=False, retryable=False, code="REGISTER_MISSING_PRIVATE_KEY", message="private key missing")
+
+        public_key_pem = self._resolve_public_key_pem()
+        payload = {
+            "node_id": self._node_id,
+            "node_type": self._node_type,
+            "public_key": public_key_pem,
+            "register_token": self._register_token,
+        }
+        try:
+            response = httpx.post(f"{self._endpoint.rstrip('/')}/api/v1/nodes/register", json=payload, timeout=10)
+            if response.status_code in (200, 201):
+                return RegistrationOutcome(success=True, retryable=False, code="REGISTER_OK", message="registered")
+
+            response_code = "REGISTER_REJECTED"
+            response_message = f"register failed with status {response.status_code}"
+            try:
+                body = response.json()
+                response_code = body.get("error", {}).get("code", response_code)
+                response_message = body.get("error", {}).get("message", response_message)
+            except ValueError:
+                pass
+
+            if response.status_code in (401, 403, 409, 422):
+                return RegistrationOutcome(success=False, retryable=False, code=response_code, message=response_message)
+            if response.status_code == 429 or response.status_code >= 500:
+                return RegistrationOutcome(success=False, retryable=True, code=response_code, message=response_message)
+            return RegistrationOutcome(success=False, retryable=True, code=response_code, message=response_message)
+        except (httpx.HTTPError, ValueError):
+            return RegistrationOutcome(success=False, retryable=True, code="REGISTER_NETWORK_ERROR", message="register request failed")
+
+    def _resolve_public_key_pem(self) -> str:
+        if self._public_key_path is not None and self._public_key_path.exists():
+            return self._public_key_path.read_text(encoding="utf-8")
+
+        private_key = load_ed25519_private_key(self._private_key_path)
+        public_key = private_key.public_key()
+        return public_key.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        ).decode("utf-8")

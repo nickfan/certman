@@ -22,6 +22,25 @@ uv run certman-worker --data-dir data --config-file config.toml --once
 uv run certman-agent --data-dir data --config-file config.toml --once
 ```
 
+## 运行依赖矩阵
+
+- `certman`（CLI 本地模式）：不依赖 Kubernetes 或 Docker，可直接通过 Python/uv 运行。
+- `certman-server` + `certman-worker`：不依赖 Kubernetes 或 Docker；Docker 仅用于打包/部署。
+- `certman-agent`：不强依赖 Kubernetes 或 Docker，但需要可访问的控制面 endpoint。
+- `scripts/certman-docker.ps1` / `scripts/certman-docker.sh`：本质是 docker 包装脚本，必须依赖 Docker 引擎。
+
+无 k8s/docker 的直接运行示例：
+
+```bash
+uv run certman --data-dir data entries
+uv run certman --data-dir data check --warn-days 30 --force-renew-days 7
+```
+
+```powershell
+uv run certman --data-dir data entries
+uv run certman --data-dir data check --warn-days 30 --force-renew-days 7
+```
+
 ## 数据目录约定
 
 默认 `--data-dir` 为 `data/`（可覆盖）。
@@ -90,6 +109,13 @@ curl -X POST http://127.0.0.1:8000/api/v1/certificates \
 curl -X POST http://127.0.0.1:8000/api/v1/webhooks \
   -H 'content-type: application/json' \
   -d '{"topic":"job.completed","endpoint":"https://example.test/hook","secret":"topsecret"}'
+```
+
+可选脚本化 e2e 验证（compose/k8s）：
+
+```bash
+python scripts/e2e-test.py --compose-only
+python scripts/e2e-test.py --k8s-only
 ```
 
 更多文档：

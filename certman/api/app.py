@@ -7,6 +7,7 @@ from fastapi.exceptions import HTTPException
 from certman.api.routes.certificates import router as certificates_router
 from certman.api.routes.health import router as health_router
 from certman.api.routes.jobs import router as jobs_router
+from certman.api.routes.nodes import router as nodes_router
 from certman.api.routes.node_agent import router as node_agent_router
 from certman.api.routes.webhooks import router as webhooks_router
 from certman.config import create_runtime, resolve_runtime_path
@@ -35,6 +36,7 @@ def create_app(*, data_dir: str = "data", config_file: str | None = None) -> Fas
     app.include_router(health_router)
     app.include_router(certificates_router)
     app.include_router(jobs_router)
+    app.include_router(nodes_router)
     app.include_router(node_agent_router)
     app.include_router(webhooks_router)
 

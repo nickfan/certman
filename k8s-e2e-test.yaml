@@ -42,6 +42,34 @@ data:
     event = "certificate.renewed"
     command = "echo 'reloaded nginx after cert renewal'"
     shell = true
+  config-agent.toml: |
+    run_mode = "agent"
+
+    [global]
+    data_dir = "/data"
+    conf_dir = "conf"
+    run_dir = "run"
+    log_dir = "log"
+    output_dir = "output"
+
+    [control_plane]
+    endpoint = "http://certman-server:8000"
+    poll_interval_seconds = 15
+
+    [node_identity]
+    node_id = "node-a"
+    private_key_path = "run/keys/node-a.pem"
+    public_key_path = "run/keys/node-a.pub.pem"
+    certificate_store_path = "output/node-a"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: certman-agent-registration
+  namespace: certman-lab
+type: Opaque
+stringData:
+  registration-token: replace-me
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -148,6 +176,45 @@ spec:
         env:
         - name: PYTHONUNBUFFERED
           value: "1"
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: certman-data
+      - name: config
+        configMap:
+          name: certman-config
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: certman-agent
+  namespace: certman-lab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: certman-agent
+  template:
+    metadata:
+      labels:
+        app: certman-agent
+    spec:
+      containers:
+      - name: agent
+        image: certman:local
+        imagePullPolicy: Never
+        command: ["uv", "run", "certman-agent", "--data-dir", "/data", "--config-file", "config-agent.toml", "--once"]
+        env:
+        - name: CERTMAN_NODE_REGISTRATION_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: certman-agent-registration
+              key: registration-token
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: config
+          mountPath: /data/conf
       volumes:
       - name: data
         persistentVolumeClaim:

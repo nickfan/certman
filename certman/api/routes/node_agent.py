@@ -47,6 +47,7 @@ def poll(payload: PollRequest, request: Request, service: JobService = Depends(g
         raise HTTPException(status_code=401, detail={"code": "AUTH_INVALID_SIGNATURE", "message": str(exc)}) from exc
 
     _store_nonce_or_conflict(runtime, payload.node_id, payload.nonce)
+    _touch_node_last_seen(runtime, payload.node_id)
 
     assignment = service.claim_next_job(node_id=payload.node_id, include_unassigned=True)
     assignments: list[dict] = []
@@ -91,6 +92,7 @@ def report_result(payload: ResultReportRequest, request: Request, service: JobSe
         raise HTTPException(status_code=401, detail={"code": "AUTH_INVALID_SIGNATURE", "message": str(exc)}) from exc
 
     _store_nonce_or_conflict(runtime, payload.node_id, payload.nonce)
+    _touch_node_last_seen(runtime, payload.node_id)
     job = service.get_job(payload.job_id)
     if job is None:
         raise HTTPException(status_code=404, detail={"code": "NOT_FOUND_JOB", "message": "job not found"})
@@ -113,9 +115,53 @@ def _get_active_node(runtime, node_id: str) -> ActiveNode:
     session_factory = make_session_factory(db_path)
     with session_factory() as session:
         node = session.query(NodeORM).filter(NodeORM.node_id == node_id).first()
-        if node is None or node.status != "active" or not node.public_key:
+        if node is None or not node.public_key:
+            raise HTTPException(status_code=401, detail={"code": "AUTH_NODE_NOT_APPROVED", "message": "node not approved"})
+        if node.status == "disabled":
+            raise HTTPException(status_code=403, detail={"code": "AUTH_NODE_DISABLED", "message": "node is disabled"})
+        if node.status != "active":
             raise HTTPException(status_code=401, detail={"code": "AUTH_NODE_NOT_APPROVED", "message": "node not approved"})
         return ActiveNode(node_id=node.node_id, public_key_pem=node.public_key)
+
+
+def _touch_node_last_seen(runtime, node_id: str) -> None:
+    """
+    Update node.last_seen with throttle window to reduce database write pressure.
+    
+    Implements adaptive throttling:
+    - First poll: always update (last_seen_updated_at is None)
+    - Subsequent polls: update only if 45+ seconds have elapsed since last update
+    - Skipped updates are silent (no error); heartbeat visibility is maintained via less-frequent writes
+    
+    This reduces write contention without sacrificing operational insights:
+    - Enables cluster health monitoring via last_seen (nodes online within 45s window)
+    - Reduces SQLite write pressure in agent-heavy scenarios (typical: 1 poll per 30s per node)
+    """
+    db_path = resolve_runtime_path(runtime, runtime.config.server.db_path)
+    session_factory = make_session_factory(db_path)
+    now = datetime.now(timezone.utc)
+    throttle_window_seconds = 45
+    
+    with session_factory() as session:
+        node = session.query(NodeORM).filter(NodeORM.node_id == node_id).first()
+        if node is None:
+            return
+        
+        # Check throttle: skip update if within throttle window
+        if node.last_seen_updated_at is not None:
+            last_updated_at = node.last_seen_updated_at
+            if last_updated_at.tzinfo is None:
+                # SQLite may return naive datetimes even for timezone=True columns.
+                last_updated_at = last_updated_at.replace(tzinfo=timezone.utc)
+            elapsed = (now - last_updated_at).total_seconds()
+            if elapsed < throttle_window_seconds:
+                return  # Within throttle window, skip update
+        
+        # Update last_seen and track update timestamp
+        node.last_seen = now
+        node.last_seen_updated_at = now
+        node.updated_at = now
+        session.commit()
 
 
 def _store_nonce_or_conflict(runtime, node_id: str, nonce: str) -> None:

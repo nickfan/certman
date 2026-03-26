@@ -57,3 +57,10 @@ class ResultReportRequest(BaseModel):
     timestamp: int
     nonce: str
     signature: str
+
+
+class NodeRegisterRequest(BaseModel):
+    node_id: str
+    node_type: str = "agent"
+    public_key: str
+    register_token: str
