@@ -27,6 +27,11 @@ uv run certman-mcp --endpoint http://127.0.0.1:8000
 
 The MCP server uses stdio transport and exposes tools for health, certificate jobs, jobs query/wait, and webhook CRUD.
 
+Notes:
+
+1. `cert_create` and `cert_renew` are asynchronous: they return `job_id`; use `job_wait` to wait for terminal state.
+2. Current event topics are job-level (`job.queued`, `job.completed`, `job.failed`). Certificate-level events are planned for addon/plugin integration.
+
 ## 3. `certmanctl` to REST mapping
 
 | `certmanctl` | REST endpoint |
@@ -55,3 +60,11 @@ Recommended order for AI tooling:
 
 Use `certmanctl` when you want stable operator UX and predictable exit codes.
 Use REST + OpenAPI when you want typed client generation or direct tool integration.
+
+## 5. cert-manager addon/plugin planning status
+
+cert-manager collaboration is currently tracked as an addon/plugin/extension design item and is **not** implemented in this phase.
+
+Design registry:
+
+- `docs/plans/2026-03-27-cert-manager-addon-plugin-plan.md`

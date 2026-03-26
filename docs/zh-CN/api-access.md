@@ -27,6 +27,11 @@ uv run certman-mcp --endpoint http://127.0.0.1:8000
 
 该 MCP Server 使用 stdio 传输，提供 health、证书任务、job 查询/等待、webhook CRUD 等工具。
 
+说明：
+
+1. `cert_create` 与 `cert_renew` 为异步语义，仅返回 `job_id`，需配合 `job_wait` 等待终态。
+2. 当前事件主题为 job 级（`job.queued`、`job.completed`、`job.failed`），证书级事件属于后续 addon/plugin 集成规划。
+
 ## 3. `certmanctl` 与 REST 的对应关系
 
 | `certmanctl` | REST endpoint |
@@ -55,3 +60,11 @@ uv run certman-mcp --endpoint http://127.0.0.1:8000
 
 如果目标是稳定退出码和命令式操作，优先用 `certmanctl`。
 如果目标是生成 typed client 或直接挂工具，优先用 REST + OpenAPI。
+
+## 5. cert-manager addon/plugin 规划状态
+
+与 cert-manager 的协作能力当前登记为 addon/plugin/extension 规划项，本期不实现。
+
+规划文档：
+
+- `docs/plans/2026-03-27-cert-manager-addon-plugin-plan.md`

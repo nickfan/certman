@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import os
 
-from certman.config import EntryConfig
+from certman.config import EntryConfig, normalize_account_id
 
 
 @dataclass(frozen=True)
@@ -53,8 +53,9 @@ def aliyun_credentials_for_entry(entry: EntryConfig) -> AliyunCredentials:
     if not entry.account_id:
         raise ValueError("aliyun entry missing account_id or credentials")
 
-    ak = os.getenv(f"CERTMAN_ALIYUN_{entry.account_id}_ACCESS_KEY_ID")
-    sk = os.getenv(f"CERTMAN_ALIYUN_{entry.account_id}_ACCESS_KEY_SECRET")
+    account = normalize_account_id(entry.account_id)
+    ak = os.getenv(f"CERTMAN_ALIYUN_{account}_ACCESS_KEY_ID")
+    sk = os.getenv(f"CERTMAN_ALIYUN_{account}_ACCESS_KEY_SECRET")
     if not ak or not sk:
         raise ValueError(f"missing aliyun env keys for account_id={entry.account_id}")
 
@@ -94,7 +95,8 @@ def cloudflare_credentials_for_entry(entry: EntryConfig) -> CloudflareCredential
     if not entry.account_id:
         raise ValueError("cloudflare entry missing account_id or credentials.api_token")
 
-    token = os.getenv(f"CERTMAN_CLOUDFLARE_{entry.account_id}_API_TOKEN")
+    account = normalize_account_id(entry.account_id)
+    token = os.getenv(f"CERTMAN_CLOUDFLARE_{account}_API_TOKEN")
     if not token:
         raise ValueError(
             f"missing cloudflare env key for account_id={entry.account_id}"
@@ -119,6 +121,8 @@ def write_cloudflare_credentials_ini(path: Path, creds: CloudflareCredentials) -
 # ---------------------------------------------------------------------------
 
 def route53_credentials_for_entry(entry: EntryConfig) -> Route53Credentials:
+    account = normalize_account_id(entry.account_id) if entry.account_id else None
+
     # 1) explicit credentials
     creds = entry.credentials
     if creds.access_key_id and creds.access_key_secret:
@@ -126,8 +130,8 @@ def route53_credentials_for_entry(entry: EntryConfig) -> Route53Credentials:
             access_key_id=_resolve_value(creds.access_key_id),
             secret_access_key=_resolve_value(creds.access_key_secret),
             region=_resolve_value(
-                os.getenv(f"CERTMAN_AWS_{entry.account_id}_REGION", "us-east-1")
-                if entry.account_id
+                os.getenv(f"CERTMAN_AWS_{account}_REGION", "us-east-1")
+                if account
                 else "us-east-1"
             ),
         )
@@ -136,9 +140,9 @@ def route53_credentials_for_entry(entry: EntryConfig) -> Route53Credentials:
     if not entry.account_id:
         raise ValueError("route53 entry missing account_id or credentials")
 
-    ak = os.getenv(f"CERTMAN_AWS_{entry.account_id}_ACCESS_KEY_ID")
-    sk = os.getenv(f"CERTMAN_AWS_{entry.account_id}_SECRET_ACCESS_KEY")
-    region = os.getenv(f"CERTMAN_AWS_{entry.account_id}_REGION", "us-east-1")
+    ak = os.getenv(f"CERTMAN_AWS_{account}_ACCESS_KEY_ID")
+    sk = os.getenv(f"CERTMAN_AWS_{account}_SECRET_ACCESS_KEY")
+    region = os.getenv(f"CERTMAN_AWS_{account}_REGION", "us-east-1")
     if not ak or not sk:
         raise ValueError(
             f"missing route53 env keys for account_id={entry.account_id}"

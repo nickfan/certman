@@ -4,6 +4,7 @@ import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Literal
 
 from certman.certbot_runner import CertbotPaths, run_certbot
 from certman.certs import get_cert_status
@@ -55,6 +56,7 @@ def resolve_entry_cert_name(
     entry,
     *,
     require_existing_lineage: bool = False,
+    resolution_mode: Literal["latest", "strict"] = "latest",
 ) -> str:
     if entry.cert_name:
         return entry.cert_name
@@ -62,18 +64,31 @@ def resolve_entry_cert_name(
     renewal_dir = runtime.paths.run_dir / runtime.config.global_.letsencrypt_dir / "renewal"
     exact_path = renewal_dir / f"{entry.primary_domain}.conf"
     matches = sorted(renewal_dir.glob(f"{entry.primary_domain}-*.conf"))
-    if exact_path.exists() and matches:
-        raise ValueError(
-            f"multiple certificate lineages match {entry.primary_domain}; set entry.cert_name explicitly"
-        )
+
+    candidates: list[Path] = []
     if exact_path.exists():
-        return entry.primary_domain
-    if len(matches) == 1:
-        return matches[0].stem
-    if len(matches) > 1:
-        raise ValueError(
-            f"multiple certificate lineages match {entry.primary_domain}; set entry.cert_name explicitly"
-        )
+        candidates.append(exact_path)
+    candidates.extend(matches)
+
+    if resolution_mode == "strict":
+        if exact_path.exists() and matches:
+            raise ValueError(
+                f"multiple certificate lineages match {entry.primary_domain}; set entry.cert_name explicitly"
+            )
+        if exact_path.exists():
+            return entry.primary_domain
+        if len(matches) == 1:
+            return matches[0].stem
+        if len(matches) > 1:
+            raise ValueError(
+                f"multiple certificate lineages match {entry.primary_domain}; set entry.cert_name explicitly"
+            )
+    elif resolution_mode == "latest":
+        if candidates:
+            latest = max(candidates, key=lambda p: (p.stat().st_mtime_ns, p.name))
+            return entry.primary_domain if latest == exact_path else latest.stem
+    else:
+        raise ValueError(f"unsupported lineage resolution_mode: {resolution_mode}")
 
     if require_existing_lineage:
         raise ValueError(
@@ -302,6 +317,7 @@ class CertService:
                 self._runtime,
                 entry,
                 require_existing_lineage=True,
+                resolution_mode="strict",
             ),
             env_overrides=self._prepare_credentials(entry),
         )

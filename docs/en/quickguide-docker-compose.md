@@ -1,56 +1,115 @@
 # Docker Compose Quick Guide
 
-**Translation in Progress** | [中文版本 (View Chinese)](../zh-CN/quickguide-docker-compose.md)
+This guide provides a runnable end-to-end workflow with current config schema and command behavior.
 
-This guide is currently being translated from Chinese. For now, please refer to the **[Chinese version](../zh-CN/quickguide-docker-compose.md)** which contains complete working examples.
+Reference Chinese version: [../zh-CN/quickguide-docker-compose.md](../zh-CN/quickguide-docker-compose.md)
 
-## Overview (English)
+## Scenario
 
-This quick guide demonstrates how to use certman with Docker Compose to:
-- Configure certificate settings via TOML files
-- Request SSL certificates for domains
-- Set up automatic renewal and monitoring
-- Export certificates for web servers
+Alice owns `mydemo1.com` on AWS Route53 and wants to issue, renew, and export certificates with certman.
 
-## Example Scenario
+## 1. Prerequisites
 
-**Background**: Alice has a domain `mydemo1.com` hosted on AWS Route53 with AWS credentials (Access Key and Secret Key). She needs to request, renew, and export SSL certificates.
+1. Docker and Docker Compose are available.
+2. You are at project root (where `docker-compose.yml` exists).
+3. Route53 credentials are ready.
 
-This guide walks through:
-1. Prerequisites and setup
-2. Configuration file creation
-3. Certificate validation and issuance
-4. Renewal and export procedures
-5. Periodic monitoring (recommended for automation)
-6. Directory structure and outputs
+## 2. Prepare Config Files
 
-## Quick Commands
+Create `data/conf/config.toml`:
+
+```toml
+run_mode = "local"
+
+[global]
+email = "alice@mydemo1.com"
+acme_server = "staging"
+scan_items_glob = "item_*.toml"
+```
+
+Create `data/conf/item_mydemo1.toml`:
+
+```toml
+description = "mydemo1.com via route53"
+primary_domain = "mydemo1.com"
+secondary_domains = ["www.mydemo1.com"]
+dns_provider = "route53"
+account_id = "demo_route53"
+```
+
+Create `data/conf/.env`:
 
 ```bash
-# Validate configuration
-docker compose run --rm certman config-validate
+CERTMAN_AWS_DEMO_ROUTE53_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
+CERTMAN_AWS_DEMO_ROUTE53_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+CERTMAN_AWS_DEMO_ROUTE53_REGION=us-east-1
+```
 
-# Request a certificate
+Note: `account_id = "demo_route53"` is normalized to `DEMO_ROUTE53` for env lookup.
+
+## 3. Validate Configuration
+
+```bash
+# recommended: validate one target entry
+docker compose run --rm certman config-validate --name mydemo1
+
+# explicit full merged-entry validation
+docker compose run --rm certman config-validate --all
+```
+
+List merged entries:
+
+```bash
+docker compose run --rm certman entries
+```
+
+## 4. Issue Certificate
+
+```bash
 docker compose run --rm certman new --name mydemo1
+```
 
-# Renew certificates
+Expected output artifacts:
+
+1. `data/output/mydemo1/fullchain.pem`
+2. `data/output/mydemo1/privkey.pem`
+3. `data/output/mydemo1/cert.pem`
+
+## 5. Renew and Export
+
+```bash
+# renew one entry
+docker compose run --rm certman renew --name mydemo1
+
+# renew all entries
 docker compose run --rm certman renew --all
 
-# Export certificates
-docker compose run --rm certman export --all
+# export one entry
+docker compose run --rm certman export --name mydemo1
 
-# Check certificate status
-docker compose run --rm certman check --warn-days 30 --force-renew-days 7
+# export all entries
+docker compose run --rm certman export --all
 ```
+
+## 6. Routine Health Check
+
+```bash
+# inspect only
+docker compose run --rm certman check --warn-days 30 --force-renew-days 7
+
+# inspect and auto-fix
+docker compose run --rm certman check --warn-days 30 --force-renew-days 7 --fix
+```
+
+Exit codes:
+
+1. `0`: healthy
+2. `10`: warning
+3. `20`: force-renew threshold reached
+4. `30`: missing certificate or entry failure
 
 ## Links
 
-- [中文完整指南](../zh-CN/quickguide-docker-compose.md) - Full Chinese version with complete examples and explanations
-- [DNS Provider Setup](dns-providers.md)
-- [Production Cookbook](cookbook-compose.md)
-
----
-
-**Status**: 🔄 English translation in progress  
-**ETA**: Coming soon  
-**Meanwhile**: Check the [中文版本](../zh-CN/quickguide-docker-compose.md) for complete details
+1. [Production Cookbook](cookbook-compose.md)
+2. [DNS Provider Setup](dns-providers.md)
+3. [API & AI Access](api-access.md)

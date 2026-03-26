@@ -97,9 +97,32 @@ class AppConfig(BaseModel):
                 raise ValueError("server mode requires [server] configuration block")
         return self
 
-    def validate_required_secrets(self, env: dict[str, str]) -> None:
+    def validate_required_secrets(
+        self,
+        env: dict[str, str],
+        *,
+        entry_names: list[str] | None = None,
+        validate_all: bool = False,
+    ) -> None:
+        if validate_all and entry_names:
+            raise ValueError("cannot combine validate_all with entry_names")
+
+        if not validate_all and not entry_names:
+            raise ValueError("config validation requires explicit entry_names or validate_all=True")
+
+        selected_entries = self.entries
+        if entry_names:
+            wanted_names = set(entry_names)
+            selected_entries = [entry for entry in self.entries if entry.name in wanted_names]
+
+            found_names = {entry.name for entry in selected_entries}
+            missing_names = sorted(wanted_names - found_names)
+            if missing_names:
+                missing_text = ", ".join(missing_names)
+                raise ValueError(f"Unknown entry names: {missing_text}")
+
         missing: list[str] = []
-        for entry in self.entries:
+        for entry in selected_entries:
             missing.extend(_required_env_keys(entry, env))
 
         if missing:
@@ -141,6 +164,10 @@ def _env_ref_key(value: str) -> str:
     return value[2:-1].strip()
 
 
+def normalize_account_id(account_id: str) -> str:
+    return account_id.strip().replace("-", "_").upper()
+
+
 def _required_env_keys(entry: EntryConfig, env: dict[str, str]) -> list[str]:
     """Return required env keys for an entry.
 
@@ -176,7 +203,7 @@ def _required_env_keys(entry: EntryConfig, env: dict[str, str]) -> list[str]:
         return missing
 
     # 2) ops mode: require account_id based variables
-    account = entry.account_id
+    account = normalize_account_id(entry.account_id) if entry.account_id else None
     if not account:
         # No account_id and no portable credentials: treat as non-actionable.
         # This keeps template/placeholder entries from breaking config-validate.

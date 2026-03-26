@@ -78,8 +78,11 @@ uv run certman --data-dir data check --warn-days 30 --force-renew-days 7
 - `certman-worker`：后台消费任务
 
 ```bash
-# 1) 校验配置
-docker compose run --rm certman config-validate
+# 1) 校验单个或多个指定条目（推荐默认）
+docker compose run --rm certman config-validate --name <entry-name>
+
+# 1.1) 显式校验全部条目
+docker compose run --rm certman config-validate --all
 
 # 2) 查看条目
 docker compose run --rm certman entries
@@ -184,6 +187,30 @@ bash scripts/certman-docker.sh renew --all
 
 - `CERTMAN_IMAGE`: 覆盖镜像（默认 `nickfan/certman:edge`）
 - `CERTMAN_DATA_DIR_HOST`: 覆盖主机侧数据目录（默认 `<project>/data`，挂载到容器 `/data`）
+
+## 镜像 Build/Push 脚本
+
+如果需要统一执行本地构建并推送到 Docker Hub 与 GHCR，可使用：
+
+- PowerShell：`scripts/docker-image-release.ps1`
+- Shell：`scripts/docker-image-release.sh`
+
+示例：
+
+```powershell
+./scripts/docker-image-release.ps1 -Tag edge
+./scripts/docker-image-release.ps1 -Tag edge -Push
+```
+
+```bash
+bash scripts/docker-image-release.sh --tag edge
+bash scripts/docker-image-release.sh --tag edge --push
+```
+
+说明：
+
+- 执行 push 前请先完成 Docker Hub 与 GHCR 的 `docker login`。
+- 默认会同时处理 `nickfan/certman:<tag>` 与 `ghcr.io/nickfan/certman:<tag>`。
 
 ## DNS Provider 支持
 

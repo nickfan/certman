@@ -44,6 +44,12 @@ Setting up Windows Task Scheduler for automatic certificate renewal on Windows S
 ### Common Commands
 
 ```bash
+# Validate one entry (recommended)
+docker compose run --rm certman config-validate --name <entry-name>
+
+# Validate all merged entries explicitly
+docker compose run --rm certman config-validate --all
+
 # Check all certificates
 docker compose run --rm certman check --warn-days 30 --force-renew-days 7
 

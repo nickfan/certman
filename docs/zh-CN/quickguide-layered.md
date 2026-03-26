@@ -51,7 +51,7 @@ CERTMAN_AWS_MAIN_REGION=us-east-1
 1. 校验配置
 
 ```bash
-uv run certman -D data config-validate
+uv run certman -D data config-validate --name site-a
 ```
 
 2. 发证

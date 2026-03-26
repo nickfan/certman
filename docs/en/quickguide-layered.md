@@ -49,7 +49,7 @@ CERTMAN_AWS_MAIN_REGION=us-east-1
 ## 1. CLI Layer Quick Start
 
 ```bash
-uv run certman -D data config-validate
+uv run certman -D data config-validate --name site-a
 uv run certman -D data new --name site-a --verbose
 uv run certman -D data check --warn-days 30 --force-renew-days 7
 uv run certman -D data export --name site-a

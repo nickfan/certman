@@ -33,7 +33,10 @@
 用途：校验配置与必要环境变量。
 
 ```bash
-uv run certman -D data config-validate
+uv run certman -D data config-validate --name site-a
+
+# 需要全量校验时显式使用 --all
+uv run certman -D data config-validate --all
 ```
 
 失败条件：

@@ -21,51 +21,34 @@
 ### a) 主配置 `data/conf/config.toml`
 
 ```toml
-# 基础配置
-[certman]
-# Let's Encrypt 测试环境（推荐新手），生产改为 https://acme-v02.api.letsencrypt.org/directory
-acme_dir = "https://acme-staging-v02.api.letsencrypt.org/directory"
+run_mode = "local"
 
-# 邮件（必填，用于证书过期提醒）
+[global]
 email = "alice@mydemo1.com"
-
-# 默认 provider（可选，单个条目可覆盖）
-provider = "route53"
-
-# 日志级别
-log_level = "info"
+acme_server = "staging"
+scan_items_glob = "item_*.toml"
 ```
 
 ### b) 域名条目配置 `data/conf/item_mydemo1.toml`
 
 ```toml
-# mydemo1.com 证书配置
-[entry]
-name = "mydemo1"  # 条目标识符
-domain = "mydemo1.com"  # 主域名
-alt_names = ["www.mydemo1.com"]  # 替代域名（可选）
-provider = "route53"  # DNS provider，必须与 dns-providers.md 中的支持列表一致
-
-# 证书验证方式（推荐 "dns-01" 以支持泛域名）
-challenge_type = "dns-01"
-
-# Route53 凭据配置
-# 方式1（推荐）：通过 .env 文件管理凭据（详见下方）
-# 方式2：直接在此处指定（DEMO ONLY，生产环境应使用方式1）
-# [credentials]
-# aws_access_key_id = "AKIAIOSFODNN7EXAMPLE"
-# aws_secret_access_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
-# region = "us-east-1"
+description = "mydemo1.com via route53"
+primary_domain = "mydemo1.com"
+secondary_domains = ["www.mydemo1.com"]
+dns_provider = "route53"
+account_id = "demo_route53"
 ```
 
 ### c) 环境变量 `data/conf/.env`（推荐方式）
 
 ```bash
 # Route53 凭据 - mydemo1 条目
-CERTMAN_ROUTE53_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
-CERTMAN_ROUTE53_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
-CERTMAN_ROUTE53_REGION=us-east-1
+CERTMAN_AWS_DEMO_ROUTE53_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
+CERTMAN_AWS_DEMO_ROUTE53_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+CERTMAN_AWS_DEMO_ROUTE53_REGION=us-east-1
 ```
+
+说明：`account_id = "demo_route53"` 会在环境变量查找时归一化为 `DEMO_ROUTE53`。
 
 ⚠️ **安全提示**: 
 - `.env` 文件已在 `.gitignore` 中，不会上传到 Git
@@ -75,17 +58,20 @@ CERTMAN_ROUTE53_REGION=us-east-1
 
 ## 3. 第二步：校验配置
 
-执行校验命令：
+执行校验命令（推荐先按条目校验）：
 
 ```bash
-docker compose run --rm certman config-validate
+docker compose run --rm certman config-validate --name mydemo1
+
+# 如需全量校验，显式加 --all
+docker compose run --rm certman config-validate --all
 ```
 
 **预期输出**（成功时）:
 
 ```
 [INFO] Loading config from data/conf/config.toml
-[INFO] Loaded entry: mydemo1 (mydemo1.com, www.mydemo1.com)
+[INFO] Loaded entry: mydemo1 (...)
 [INFO] Config validation passed ✓
 ```
 
@@ -103,7 +89,7 @@ docker compose run --rm certman entries
 ```
 
 如果这一步失败，常见原因：
-- 凭据缺失：检查 `data/conf/.env` 中的 `CERTMAN_ROUTE53_ACCESS_KEY_ID` 和 `CERTMAN_ROUTE53_SECRET_ACCESS_KEY`
+- 凭据缺失：检查 `data/conf/.env` 中的 `CERTMAN_AWS_DEMO_ROUTE53_ACCESS_KEY_ID` 和 `CERTMAN_AWS_DEMO_ROUTE53_SECRET_ACCESS_KEY`
 - 配置文件路径错误：确保 `item_mydemo1.toml` 在 `data/conf/` 目录下
 - TOML 语法错误：用 TOML 在线验证器检查文件格式
 

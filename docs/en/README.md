@@ -57,6 +57,7 @@
 - [Kubernetes Service Design (../k8s-service-design.md)](../k8s-service-design.md)
 - [Dual CLI Modes (dual-cli-modes.md)](dual-cli-modes.md)
 - [Dual CLI Program Plan (../notes/plans/2026-03-26-dual-cli-program.md)](../notes/plans/2026-03-26-dual-cli-program.md)
+- [cert-manager Addon/Plugin Plan (../plans/2026-03-27-cert-manager-addon-plugin-plan.md)](../plans/2026-03-27-cert-manager-addon-plugin-plan.md)
 - Release notes & Version history
 
 ---

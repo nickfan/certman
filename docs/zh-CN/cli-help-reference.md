@@ -49,8 +49,12 @@ uv run certmanctl webhook update --help
   - `--json`：输出 JSON
 - `logs-clean`
   - `-k, --keep-days`：保留最近 N 天日志
-- `entries`、`config-validate`
+- `entries`
   - 无命令级参数
+- `config-validate`
+  - `-n, --name`：仅校验指定条目（可重复）
+  - `--all`：校验全部合并条目
+  - 范围规则：必须指定 `--name` 或 `--all`，且两者不可同时使用
 
 ## 3. 远程 CLI（`certmanctl`）参数
 

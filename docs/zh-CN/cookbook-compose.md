@@ -25,16 +25,19 @@ challenge_type = "dns-01"
 创建或修改 `data/conf/.env` 添加 Route53 凭据：
 
 ```bash
-CERTMAN_ROUTE53_ACCESS_KEY_ID=AKIA2EXAMPLE000000000
-CERTMAN_ROUTE53_SECRET_ACCESS_KEY=xxxSecretxxx...
-CERTMAN_ROUTE53_REGION=us-west-2
+CERTMAN_AWS_API_DEMO_ACCESS_KEY_ID=AKIA2EXAMPLE000000000
+CERTMAN_AWS_API_DEMO_SECRET_ACCESS_KEY=xxxSecretxxx...
+CERTMAN_AWS_API_DEMO_REGION=us-west-2
 ```
 
 ### Step 2: 校验并申请
 
 ```bash
 # 校验配置
-docker compose run --rm certman config-validate
+docker compose run --rm certman config-validate --name api-demo
+
+# 或显式全量校验
+docker compose run --rm certman config-validate --all
 
 # 确认条目已加载
 docker compose run --rm certman entries
@@ -510,7 +513,7 @@ services:
 
 ```bash
 # 首次运行会拉取（~200MB）
-docker compose run --rm certman config-validate
+docker compose run --rm certman config-validate --name api-demo
 
 # 之后的运行会使用本地缓存（秒级启动）
 docker compose run --rm certman entries
@@ -564,7 +567,7 @@ Log-Message "=== Certman Auto Renewal Started ==="
 try {
     # Step 1: 配置校验
     Log-Message "Step 1: Validating configuration..."
-    docker compose run --rm certman config-validate
+    docker compose run --rm certman config-validate --all
     if ($LASTEXITCODE -ne 0) {
         Log-Message "ERROR: Config validation failed (exit code $LASTEXITCODE)"
         exit 1
@@ -697,7 +700,7 @@ if ($CheckExitCode -eq 20) {
 
 ### 问题 1: Config validation 失败
 
-**症状**: `docker compose run --rm certman config-validate` 返回错误
+**症状**: `docker compose run --rm certman config-validate` 返回错误（或提示必须指定 `--name/--all`）
 
 **排查步骤**:
 
@@ -712,7 +715,7 @@ ls -la data/conf/item_*.toml
 grep -n "name\|domain\|provider" data/conf/item_*.toml
 
 # 4. 查看详细错误日志
-docker compose run --rm certman config-validate 2>&1 | head -20
+docker compose run --rm certman config-validate --all 2>&1 | head -20
 ```
 
 **常见原因和解决**:

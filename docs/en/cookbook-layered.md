@@ -9,7 +9,7 @@ Goal: issue cert for site-a and export delivery artifacts.
 Steps:
 
 ```bash
-uv run certman -D data config-validate
+uv run certman -D data config-validate --name site-a
 uv run certman -D data new --name site-a --verbose
 uv run certman -D data export --name site-a
 ```

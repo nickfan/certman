@@ -31,7 +31,10 @@ This manual focuses on parameters, behavior contracts, state machine semantics, 
 ### 3.1 config-validate
 
 ```bash
-uv run certman -D data config-validate
+uv run certman -D data config-validate --name site-a
+
+# full merged-entry validation
+uv run certman -D data config-validate --all
 ```
 
 Fails when required provider env vars are missing or run_mode requirements are not met.

@@ -41,6 +41,7 @@ These documents are used by all language versions:
 - **DNS Providers**: [dns-providers.md](dns-providers.md) - Setup for Route53, Cloudflare, and Aliyun
 - **Kubernetes Deployment**: [k8s-service-design.md](k8s-service-design.md) - K8s integration guide
 - **Dual CLI Program**: [notes/plans/2026-03-26-dual-cli-program.md](notes/plans/2026-03-26-dual-cli-program.md) - Requirement, architecture, and implementation plan
+- **cert-manager 协作扩展规划**: [plans/2026-03-27-cert-manager-addon-plugin-plan.md](plans/2026-03-27-cert-manager-addon-plugin-plan.md) - Addon/Plugin/Extension planning registry (this phase is design-only)
 
 ---
 
@@ -101,4 +102,4 @@ docs/
 
 ---
 
-**Last Updated**: 2026-03-26
+**Last Updated**: 2026-03-27

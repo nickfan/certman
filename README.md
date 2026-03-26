@@ -98,8 +98,11 @@ services:
 Common compose commands (configuration-driven):
 
 ```bash
-# 1) validate merged config
-docker compose run --rm certman config-validate
+# 1) validate one or more explicit entries (recommended default)
+docker compose run --rm certman config-validate --name <entry-name>
+
+# 1.1) validate all merged entries explicitly
+docker compose run --rm certman config-validate --all
 
 # 2) list merged entries
 docker compose run --rm certman entries
@@ -216,6 +219,30 @@ Optional environment overrides for wrapper scripts:
 - `CERTMAN_IMAGE`: override image tag (default: `nickfan/certman:edge`)
 - `CERTMAN_DATA_DIR_HOST`: override host data dir mounted to `/data` (default: `<project>/data`)
 
+## Image Build/Push Scripts
+
+Use release scripts when you need a consistent local build + publish flow for both Docker Hub and GHCR.
+
+- PowerShell: `scripts/docker-image-release.ps1`
+- Shell: `scripts/docker-image-release.sh`
+
+Examples:
+
+```powershell
+./scripts/docker-image-release.ps1 -Tag edge
+./scripts/docker-image-release.ps1 -Tag edge -Push
+```
+
+```bash
+bash scripts/docker-image-release.sh --tag edge
+bash scripts/docker-image-release.sh --tag edge --push
+```
+
+Notes:
+
+- Ensure `docker login` is done for both Docker Hub and GHCR before `-Push`/`--push`.
+- Default tags are published to both `nickfan/certman:<tag>` and `ghcr.io/nickfan/certman:<tag>`.
+
 ## Quickstart (Windows)
 
 On Windows, `certbot` may require an elevated shell.
@@ -231,6 +258,7 @@ Credentials priority (all providers):
 
 - If an entry has provider-specific `credentials.*` fields, certman uses them directly (supports `${ENV_VAR}` references).
 - Otherwise, if an entry has `account_id`, certman reads provider-specific environment variables from `data/conf/.env` or the process environment.
+  - account_id is normalized for env lookup: trim, uppercase, and replace `-` with `_`.
   - Aliyun: `CERTMAN_ALIYUN_<account_id>_ACCESS_KEY_ID` and `CERTMAN_ALIYUN_<account_id>_ACCESS_KEY_SECRET`
   - Cloudflare: `CERTMAN_CLOUDFLARE_<account_id>_API_TOKEN`
   - Route53: `CERTMAN_AWS_<account_id>_ACCESS_KEY_ID`, `CERTMAN_AWS_<account_id>_SECRET_ACCESS_KEY`, `CERTMAN_AWS_<account_id>_REGION`

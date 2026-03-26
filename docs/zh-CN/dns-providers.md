@@ -18,12 +18,16 @@ All required certbot plugins are managed in [pyproject.toml](../../pyproject.tom
 Example commands:
 
 ```sh
-uv run certman config-validate
+uv run certman config-validate --name <entry-name>
+# 仅在你需要校验全部合并条目时使用 --all
+uv run certman config-validate --all
 uv run certman entries
 uv run certman new --name <entry-name>
 uv run certman renew --name <entry-name>
 uv run certman renew --all
 ```
+
+环境变量查找会先对 account_id 做归一化（去首尾空格、转大写、`-` 转 `_`）。
 
 On Windows, `certbot` may require an elevated shell. Prefer:
 
@@ -247,7 +251,10 @@ Notes:
 Validate config before issuing:
 
 ```sh
-uv run certman config-validate
+uv run certman config-validate --name mysite
+
+# 需要全量校验时再使用 --all
+uv run certman config-validate --all
 ```
 
 List merged entries:

@@ -58,15 +58,44 @@ def _service(ctx: typer.Context) -> CertService:
 
 
 @app.command("config-validate")
-def config_validate(ctx: typer.Context):
-    """Validate config and required env secrets.
+def config_validate(
+    ctx: typer.Context,
+    name: list[str] = typer.Option(
+        None,
+        "--name",
+        "-n",
+        help="Validate only the specified entry name; repeat to validate multiple entries",
+    ),
+    all: bool = typer.Option(
+        False,
+        "--all",
+        help="Validate all merged entries",
+    ),
+):
+    """Validate config and required env secrets with explicit scope.
+
+    Scope rules:
+    - Must provide at least one --name or use --all
+    - --name and --all cannot be combined
 
     Exit code:
     - 0: valid
     - non-zero: validation failure
     """
+    if all and name:
+        raise typer.BadParameter("cannot combine --all with --name")
+    if not all and not name:
+        raise typer.BadParameter("must specify at least one --name or use --all")
+
     runtime = ctx.obj
-    runtime.config.validate_required_secrets(runtime.env)
+    try:
+        runtime.config.validate_required_secrets(
+            runtime.env,
+            entry_names=list(name or []),
+            validate_all=all,
+        )
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
     typer.echo("OK")
 
 

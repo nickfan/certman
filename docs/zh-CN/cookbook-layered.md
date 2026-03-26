@@ -14,7 +14,7 @@
 4. 执行 export。
 
 ```bash
-uv run certman -D data config-validate
+uv run certman -D data config-validate --name site-a
 uv run certman -D data new --name site-a --verbose
 uv run certman -D data export --name site-a
 ```

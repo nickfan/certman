@@ -322,7 +322,7 @@ def test_check_uses_cert_name_override_path(monkeypatch, tmp_path: Path) -> None
     assert captured["path"] == cert_path / "cert.pem"
 
 
-def test_check_returns_missing_for_ambiguous_lineage(tmp_path: Path) -> None:
+def test_check_prefers_latest_lineage_when_exact_and_suffix_coexist(monkeypatch, tmp_path: Path) -> None:
     data_dir = tmp_path / "data"
     paths = Paths(
         data_dir=data_dir,
@@ -348,12 +348,29 @@ def test_check_returns_missing_for_ambiguous_lineage(tmp_path: Path) -> None:
         }
     )
     service = CertService(Runtime(paths=paths, config=config, env={}))
+    captured: dict[str, Path] = {}
+
+    status = type(
+        "Status",
+        (),
+        {"days_left": 15, "not_after": datetime(2026, 1, 1, tzinfo=timezone.utc)},
+    )()
+
+    def fake_get_cert_status(path: Path):
+        captured["path"] = path
+        return status
+
+    monkeypatch.setattr("certman.services.cert_service.get_cert_status", fake_get_cert_status)
+
+    cert_dir = paths.run_dir / "letsencrypt" / "live" / "example.com-0001"
+    cert_dir.mkdir(parents=True, exist_ok=True)
+    (cert_dir / "cert.pem").write_text("dummy", encoding="utf-8")
 
     results = service.check(name="site-a")
 
-    assert results[0]["status"] == "missing"
-    assert results[0]["reason"] == "lineage-unresolved"
-    assert "multiple certificate lineages match example.com" in results[0]["error"]
+    assert results[0]["status"] == "warn"
+    assert results[0]["cert_name"] == "example.com-0001"
+    assert captured["path"] == cert_dir / "cert.pem"
 
 
 def test_renew_raises_for_ambiguous_lineage_candidates(monkeypatch, tmp_path: Path) -> None:

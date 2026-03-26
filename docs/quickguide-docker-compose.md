@@ -77,7 +77,10 @@ CERTMAN_ROUTE53_REGION=us-east-1
 执行校验命令：
 
 ```bash
-docker compose run --rm certman config-validate
+docker compose run --rm certman config-validate --name mydemo1
+
+# 如需全量校验，显式加 --all
+docker compose run --rm certman config-validate --all
 ```
 
 **预期输出**（成功时）:

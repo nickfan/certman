@@ -81,7 +81,10 @@ def create_mcp_server(config: McpServerConfig):
 
     @mcp.tool()
     def cert_create(entry_name: str) -> dict[str, Any]:
-        """Submit a certificate issuance job for one entry."""
+        """Submit an async certificate issuance job for one entry.
+
+        Returns a job_id. Use job_wait to wait for terminal status.
+        """
         return _call_api(
             method="POST",
             path="/api/v1/certificates",
@@ -101,7 +104,10 @@ def create_mcp_server(config: McpServerConfig):
 
     @mcp.tool()
     def cert_renew(entry_name: str) -> dict[str, Any]:
-        """Create or reuse a renewal job for one entry."""
+        """Create or reuse an async renewal job for one entry.
+
+        Returns a job_id. Use job_wait to wait for terminal status.
+        """
         return _call_api(method="POST", path=f"/api/v1/certificates/{_path_segment(entry_name)}/renew", config=config)
 
     @mcp.tool()
@@ -125,7 +131,10 @@ def create_mcp_server(config: McpServerConfig):
 
     @mcp.tool()
     def job_wait(job_id: str) -> dict[str, Any]:
-        """Poll a job until completed, failed, or cancelled."""
+        """Poll a job until completed, failed, or cancelled.
+
+        Intended to be paired with cert_create and cert_renew.
+        """
         deadline = time.monotonic() + config.max_wait
         terminal = {"completed", "failed", "cancelled"}
 

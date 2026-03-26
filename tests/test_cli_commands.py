@@ -57,6 +57,141 @@ dns_provider = "aliyun"
     assert "--json" in result.stdout
 
 
+def test_config_validate_requires_explicit_target_or_all(tmp_path: Path) -> None:
+    runner = CliRunner()
+    data_dir = tmp_path / "data"
+    conf_dir = data_dir / "conf"
+    conf_dir.mkdir(parents=True)
+    (conf_dir / "config.toml").write_text(
+        """
+run_mode = "local"
+
+[global]
+data_dir = "data"
+email = "ops@example.com"
+
+[[entries]]
+name = "site-a"
+primary_domain = "example.com"
+dns_provider = "aliyun"
+account_id = "ali-kumaxiong"
+""".strip(),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "--data-dir",
+            str(data_dir),
+            "--config-file",
+            "config.toml",
+            "config-validate",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "must specify at least one --name or use --all" in result.output
+
+
+def test_config_validate_validates_selected_entries_only(tmp_path: Path) -> None:
+    runner = CliRunner()
+    data_dir = tmp_path / "data"
+    conf_dir = data_dir / "conf"
+    conf_dir.mkdir(parents=True)
+    (conf_dir / "config.toml").write_text(
+        """
+run_mode = "local"
+
+[global]
+data_dir = "data"
+email = "ops@example.com"
+scan_items_glob = "item_*.toml"
+""".strip(),
+        encoding="utf-8",
+    )
+    (conf_dir / "item_kumaxiong.toml").write_text(
+        """
+primary_domain = "kumaxiong.com"
+dns_provider = "aliyun"
+account_id = "ali-kumaxiong"
+""".strip(),
+        encoding="utf-8",
+    )
+    (conf_dir / "item_site-a.toml").write_text(
+        """
+primary_domain = "site-a.example.com"
+dns_provider = "cloudflare"
+account_id = "test_cloudflare"
+""".strip(),
+        encoding="utf-8",
+    )
+    (conf_dir / ".env").write_text(
+        """
+CERTMAN_ALIYUN_ALI_KUMAXIONG_ACCESS_KEY_ID=ak
+CERTMAN_ALIYUN_ALI_KUMAXIONG_ACCESS_KEY_SECRET=sk
+""".strip(),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "--data-dir",
+            str(data_dir),
+            "--config-file",
+            "config.toml",
+            "config-validate",
+            "--name",
+            "kumaxiong",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "OK" in result.stdout
+
+
+def test_config_validate_uses_normalized_account_id_for_all(tmp_path: Path) -> None:
+    runner = CliRunner()
+    data_dir = tmp_path / "data"
+    conf_dir = data_dir / "conf"
+    conf_dir.mkdir(parents=True)
+    (conf_dir / "config.toml").write_text(
+        """
+run_mode = "local"
+
+[global]
+data_dir = "data"
+email = "ops@example.com"
+scan_items_glob = "item_*.toml"
+""".strip(),
+        encoding="utf-8",
+    )
+    (conf_dir / "item_site-a.toml").write_text(
+        """
+primary_domain = "site-a.example.com"
+dns_provider = "cloudflare"
+account_id = "test_cloudflare"
+""".strip(),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "--data-dir",
+            str(data_dir),
+            "--config-file",
+            "config.toml",
+            "config-validate",
+            "--all",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "CERTMAN_CLOUDFLARE_TEST_CLOUDFLARE_API_TOKEN" in result.output
+
+
 def test_new_command_delegates_to_service_and_export(monkeypatch, tmp_path: Path) -> None:
     data_dir = tmp_path / "data"
     conf_dir = data_dir / "conf"

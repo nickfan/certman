@@ -49,8 +49,12 @@ Command options:
   - `--json`: Print JSON result
 - `logs-clean`
   - `-k, --keep-days`: Keep latest N days logs
-- `entries`, `config-validate`
+- `entries`
   - no command-specific options
+- `config-validate`
+  - `-n, --name`: validate only specified entry (repeatable)
+  - `--all`: validate all merged entries
+  - scope rule: must provide `--name` or `--all`; cannot combine both
 
 ## 3. Remote CLI (`certmanctl`) parameters
 

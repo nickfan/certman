@@ -3,6 +3,10 @@
 > 评估日期: 2026-03-24
 > 状态: 设计草案（已按最新定位修订）
 
+> 补充（2026-03-27）: cert-manager 协作以 addon/plugin/extension 形式登记为后续扩展，详见
+> `docs/plans/2026-03-27-cert-manager-addon-plugin-plan.md`。
+> 本期仅完成规划，不进入实现。
+
 ---
 
 ## 1. 目标重定义
