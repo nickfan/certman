@@ -1,5 +1,7 @@
 # certman
 
+**[中文版本 (中文)/Chinese Version](README.zh-CN.md) | English**
+
 SSL certificate management CLI (certbot + DNS plugins).
 
 ## Data layout
@@ -29,6 +31,50 @@ GitHub Container Registry (GHCR): `ghcr.io/nickfan/certman`
 
 If GHCR images are not pullable (403) even though workflow succeeded:
 - Go to GitHub repo **Packages** `certman` **Package settings** set **Visibility** to **Public**.
+
+## Docker Compose Quick Flow
+
+The repository includes a compose service in [docker-compose.yml](docker-compose.yml):
+
+```yaml
+services:
+  certman:
+    build: .
+    entrypoint: ["uv", "run", "certman"]
+    volumes:
+      - ./data:/data
+    environment:
+      CERTMAN_DATA_DIR: /data
+```
+
+Common compose commands (configuration-driven):
+
+```bash
+# 1) validate merged config
+docker compose run --rm certman config-validate
+
+# 2) list merged entries
+docker compose run --rm certman entries
+
+# 3) issue certificate for one entry
+docker compose run --rm certman new --name <entry-name>
+
+# 4) renew one entry or all entries
+docker compose run --rm certman renew --name <entry-name>
+docker compose run --rm certman renew --all
+
+# 5) export certificate files for one entry or all entries
+docker compose run --rm certman export --name <entry-name>
+docker compose run --rm certman export --all
+```
+
+More detailed docs:
+
+- [📖 Documentation Guide (English)](docs/en/) - Full navigation and all guides
+- Quick guide: [docs/en/quickguide-docker-compose.md](docs/en/quickguide-docker-compose.md)
+- Cookbook: [docs/en/cookbook-compose.md](docs/en/cookbook-compose.md)
+- DNS Providers: [docs/en/dns-providers.md](docs/en/dns-providers.md)
+- 📖 [中文文档导航 (Chinese Guide)](docs/zh-CN/) - 完整导航和所有指南
 
 Run (example):
 
