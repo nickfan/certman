@@ -5,20 +5,29 @@ description = "SSL certificate management CLI (certbot + DNS plugins)"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "alembic>=1.16.5",
     "certbot>=5.2.2",
     "certbot-dns-aliyun>=2.0.0",
     "certbot-dns-cloudflare>=3.2.0",
     "certbot-dns-route53>=3.2.0",
+    "cryptography>=45.0.7",
+    "fastapi>=0.116.1",
+    "httpx>=0.28.1",
     "pydantic>=2.12.5",
     "pydantic-settings>=2.12.0",
     "python-dotenv>=1.2.1",
     "pyyaml>=6.0.3",
+    "sqlalchemy>=2.0.43",
     "tomli>=2.3.0",
     "typer>=0.21.1",
+    "uvicorn>=0.35.0",
 ]
 
 [project.scripts]
 certman = "certman.cli:main"
+certman-agent = "certman.node_agent.agent:main"
+certman-server = "certman.server:main"
+certman-worker = "certman.worker:main"
 
 [tool.uv]
 package = true

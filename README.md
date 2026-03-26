@@ -4,6 +4,24 @@
 
 SSL certificate management CLI (certbot + DNS plugins).
 
+## Runtime Modes
+
+CertMan now exposes four runtime surfaces built on the same config and service layer:
+
+- `certman`: local operator CLI for `new`, `renew`, `check`, `export`
+- `certman-server`: FastAPI control plane for `/health`, job submission, job query, webhook subscription
+- `certman-worker`: background job runner for queued `issue` and `renew` jobs
+- `certman-agent`: node-side polling agent scaffold for controlled execution mode
+
+Typical local commands:
+
+```bash
+uv run certman --help
+uv run certman-server --data-dir data --config-file config.toml
+uv run certman-worker --data-dir data --config-file config.toml --once
+uv run certman-agent --data-dir data --config-file config.toml --once
+```
+
 ## Data layout
 
 Default `--data-dir` is `data/` (configurable).
@@ -30,6 +48,7 @@ GitHub Container Registry (GHCR): `ghcr.io/nickfan/certman`
 - `latest` + `X.Y.Z`: built from git tags like `vX.Y.Z`
 
 If GHCR images are not pullable (403) even though workflow succeeded:
+
 - Go to GitHub repo **Packages** `certman` **Package settings** set **Visibility** to **Public**.
 
 ## Docker Compose Quick Flow
@@ -40,11 +59,21 @@ The repository includes a compose service in [docker-compose.yml](docker-compose
 services:
   certman:
     build: .
-    entrypoint: ["uv", "run", "certman"]
+    entrypoint: ["uv", "run", "certman", "--data-dir", "/data"]
     volumes:
       - ./data:/data
-    environment:
-      CERTMAN_DATA_DIR: /data
+  certman-server:
+    build: .
+    entrypoint: ["uv", "run", "certman-server", "--data-dir", "/data", "--config-file", "config.compose-server.toml"]
+    volumes:
+      - ./data:/data
+    ports:
+      - "8000:8000"
+  certman-worker:
+    build: .
+    entrypoint: ["uv", "run", "certman-worker", "--data-dir", "/data", "--config-file", "config.compose-server.toml", "--loop", "--interval-seconds", "30"]
+    volumes:
+      - ./data:/data
 ```
 
 Common compose commands (configuration-driven):
@@ -66,6 +95,21 @@ docker compose run --rm certman renew --all
 # 5) export certificate files for one entry or all entries
 docker compose run --rm certman export --name <entry-name>
 docker compose run --rm certman export --all
+
+# 6) start control plane and worker
+docker compose up certman-server certman-worker
+```
+
+Server API quick checks:
+
+```bash
+curl http://127.0.0.1:8000/health
+curl -X POST http://127.0.0.1:8000/api/v1/certificates \
+  -H 'content-type: application/json' \
+  -d '{"entry_name":"site-a"}'
+curl -X POST http://127.0.0.1:8000/api/v1/webhooks \
+  -H 'content-type: application/json' \
+  -d '{"topic":"job.completed","endpoint":"https://example.test/hook","secret":"topsecret"}'
 ```
 
 More detailed docs:
@@ -73,6 +117,9 @@ More detailed docs:
 - [📖 Documentation Guide (English)](docs/en/) - Full navigation and all guides
 - Quick guide: [docs/en/quickguide-docker-compose.md](docs/en/quickguide-docker-compose.md)
 - Cookbook: [docs/en/cookbook-compose.md](docs/en/cookbook-compose.md)
+- Layered quick guide: [docs/en/quickguide-layered.md](docs/en/quickguide-layered.md)
+- Layered cookbook: [docs/en/cookbook-layered.md](docs/en/cookbook-layered.md)
+- Layered manual: [docs/en/manual-layered.md](docs/en/manual-layered.md)
 - DNS Providers: [docs/en/dns-providers.md](docs/en/dns-providers.md)
 - 📖 [中文文档导航 (Chinese Guide)](docs/zh-CN/) - 完整导航和所有指南
 
@@ -134,7 +181,10 @@ On Windows, `certbot` may require an elevated shell.
 
 To see certbot progress in the terminal, add `-v/--verbose`.
 
+For server mode, keep one terminal for `certman-server` and another for `certman-worker --loop`.
+
 Credentials priority (all providers):
+
 - If an entry has provider-specific `credentials.*` fields, certman uses them directly (supports `${ENV_VAR}` references).
 - Otherwise, if an entry has `account_id`, certman reads provider-specific environment variables from `data/conf/.env` or the process environment.
   - Aliyun: `CERTMAN_ALIYUN_<account_id>_ACCESS_KEY_ID` and `CERTMAN_ALIYUN_<account_id>_ACCESS_KEY_SECRET`
@@ -178,6 +228,13 @@ Recommended flow:
 - Scheduled `renew` or manual `new --force` when needed.
 - `new`/`renew` default自动 `export` 到 `data/output/<entry_name>/`（可用 `--no-export` 关闭）。
 - Run `export` anytime to sync cert/key to `data/output/<entry_name>/`.
+
+## Control Plane Notes
+
+- `run_mode = "server"` requires a `[server]` block with `db_path`, `listen_host`, and `listen_port`.
+- Webhook subscriptions are stored in the control-plane database and receive signed HTTP POST callbacks.
+- `certman-worker` processes queued jobs from the same SQLite database used by `certman-server`.
+- `certman-agent` remains the controlled-node entrypoint; Phase 4 security primitives are now available for its next control-plane integration step.
 
 ## Certificate file formats
 

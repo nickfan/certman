@@ -5,17 +5,13 @@ from pathlib import Path
 from typing import Literal
 
 import os
-
-import yaml
-
 import tomllib
 
-_toml_loads = tomllib.loads
-
+import yaml
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field, model_validator
 
-# imported lazily in create_runtime to avoid cycles
+_toml_loads = tomllib.loads
 
 
 class GlobalConfig(BaseModel):
@@ -33,6 +29,13 @@ class GlobalConfig(BaseModel):
 class ControlPlaneConfig(BaseModel):
     endpoint: str
     poll_interval_seconds: int = 30
+
+
+class ServerConfig(BaseModel):
+    db_path: str = "data/run/certman.db"
+    listen_host: str = "0.0.0.0"
+    listen_port: int = 8000
+    signing_key_path: str | None = None  # Ed25519 private key; required in Phase 4
 
 
 class NodeIdentityConfig(BaseModel):
@@ -80,6 +83,7 @@ class AppConfig(BaseModel):
     control_plane: ControlPlaneConfig | None = None
     node_identity: NodeIdentityConfig | None = None
     hooks: list[HookConfig] = Field(default_factory=list)
+    server: ServerConfig | None = None
 
     @model_validator(mode="after")
     def _validate_run_mode(self):
@@ -88,6 +92,9 @@ class AppConfig(BaseModel):
                 raise ValueError("agent mode requires control_plane.endpoint")
             if self.node_identity is None or not self.node_identity.private_key_path:
                 raise ValueError("agent mode requires node_identity.private_key_path")
+        elif self.run_mode == "server":
+            if self.server is None:
+                raise ValueError("server mode requires [server] configuration block")
         return self
 
     def validate_required_secrets(self, env: dict[str, str]) -> None:
@@ -107,10 +114,27 @@ class GlobalOnlyConfig(BaseModel):
     control_plane: ControlPlaneConfig | None = None
     node_identity: NodeIdentityConfig | None = None
     hooks: list[HookConfig] = Field(default_factory=list)
+    server: ServerConfig | None = None
 
 
 def _is_env_ref(value: str) -> bool:
     return value.startswith("${") and value.endswith("}") and len(value) > 3
+
+
+def entry_domains(entry: EntryConfig) -> list[str]:
+    """Return deduplicated domain list for an entry, including wildcard if enabled."""
+    domains = [entry.primary_domain, *entry.secondary_domains]
+    if entry.wildcard:
+        domains.append(f"*.{entry.primary_domain}")
+
+    seen: set[str] = set()
+    unique: list[str] = []
+    for domain in domains:
+        if domain in seen:
+            continue
+        seen.add(domain)
+        unique.append(domain)
+    return unique
 
 
 def _env_ref_key(value: str) -> str:
@@ -192,6 +216,13 @@ class Runtime:
     paths: Paths
     config: AppConfig
     env: dict[str, str]
+
+
+def resolve_runtime_path(runtime: Runtime, configured_path: str | Path) -> Path:
+    path = Path(configured_path)
+    if path.is_absolute():
+        return path
+    return runtime.paths.data_dir.parent / path
 
 
 def create_runtime(data_dir: str, config_file: str | None) -> Runtime:

@@ -7,7 +7,7 @@ from pathlib import Path
 
 from certman.certbot_runner import CertbotPaths, run_certbot
 from certman.certs import get_cert_status
-from certman.config import Runtime
+from certman.config import Runtime, entry_domains
 from certman.providers import (
     aliyun_credentials_for_entry,
     cloudflare_credentials_for_entry,
@@ -44,21 +44,6 @@ class RenewPlan:
     entry: object
     cert_name: str
     env_overrides: dict[str, str | None]
-
-
-def _entry_domains(entry) -> list[str]:
-    domains = [entry.primary_domain, *entry.secondary_domains]
-    if entry.wildcard:
-        domains.append(f"*.{entry.primary_domain}")
-
-    seen: set[str] = set()
-    unique: list[str] = []
-    for domain in domains:
-        if domain in seen:
-            continue
-        seen.add(domain)
-        unique.append(domain)
-    return unique
 
 
 def _write_command_log(path: Path, payload: dict) -> None:
@@ -106,7 +91,7 @@ class CertService:
         entry = self._get_entry(name)
         paths = self._certbot_paths()
         provider = entry.dns_provider.lower()
-        domains = _entry_domains(entry)
+        domains = entry_domains(entry)
         env_overrides: dict[str, str] = {}
 
         if provider == "aliyun":

@@ -1,0 +1,157 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: certman-lab
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: certman-config
+  namespace: certman-lab
+data:
+  config.toml: |
+    [global]
+    data_dir = "/data"
+    conf_dir = "conf"
+    run_dir = "run"
+    log_dir = "log"
+    output_dir = "output"
+    letsencrypt_dir = "letsencrypt"
+    acme_server = "staging"
+    email = "admin@example.com"
+    scan_items_glob = "item_*.toml"
+    
+    [server]
+    db_path = "data/run/certman.db"
+    listen_host = "0.0.0.0"
+    listen_port = 8000
+    signing_key_path = "data/run/keys/server_ed25519.pem"
+    
+    [[entries]]
+    name = "site-a"
+    description = "Test site A"
+    primary_domain = "site-a.example.com"
+    secondary_domains = ["www.site-a.example.com"]
+    wildcard = true
+    dns_provider = "cloudflare"
+    account_id = "test_cloudflare"
+    
+    [[hooks]]
+    name = "reload_nginx"
+    event = "certificate.renewed"
+    command = "echo 'reloaded nginx after cert renewal'"
+    shell = true
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: certman-data
+  namespace: certman-lab
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: certman-server
+  namespace: certman-lab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: certman-server
+  template:
+    metadata:
+      labels:
+        app: certman-server
+    spec:
+      containers:
+      - name: server
+        image: certman:local
+        imagePullPolicy: Never
+        command: ["uv", "run", "certman-server", "--data-dir", "/data", "--config-file", "config.toml"]
+        ports:
+        - containerPort: 8000
+          name: http
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: config
+          mountPath: /data/conf
+        env:
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: certman-data
+      - name: config
+        configMap:
+          name: certman-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: certman-server
+  namespace: certman-lab
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+  selector:
+    app: certman-server
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: certman-worker
+  namespace: certman-lab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: certman-worker
+  template:
+    metadata:
+      labels:
+        app: certman-worker
+    spec:
+      containers:
+      - name: worker
+        image: certman:local
+        imagePullPolicy: Never
+        command: ["uv", "run", "certman-worker", "--data-dir", "/data", "--config-file", "config.toml", "--loop", "--interval-seconds", "10"]
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: config
+          mountPath: /data/conf
+        env:
+        - name: PYTHONUNBUFFERED
+          value: "1"
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: certman-data
+      - name: config
+        configMap:
+          name: certman-config

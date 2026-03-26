@@ -1,8 +1,18 @@
 services:
   certman:
     build: .
-    entrypoint: ["uv", "run", "certman"]
+    entrypoint: ["uv", "run", "certman", "--data-dir", "/data"]
     volumes:
       - ./data:/data
-    environment:
-      CERTMAN_DATA_DIR: /data
+  certman-server:
+    build: .
+    entrypoint: ["uv", "run", "certman-server", "--data-dir", "/data", "--config-file", "config.compose-server.toml"]
+    volumes:
+      - ./data:/data
+    ports:
+      - "8000:8000"
+  certman-worker:
+    build: .
+    entrypoint: ["uv", "run", "certman-worker", "--data-dir", "/data", "--config-file", "config.compose-server.toml", "--loop", "--interval-seconds", "30"]
+    volumes:
+      - ./data:/data

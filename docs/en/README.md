@@ -10,6 +10,10 @@
   - Best for first-time users
   - Complete workflow: config → issue → renew → export → check
 
+- **[Layered Quick Guide (quickguide-layered.md)](quickguide-layered.md)** - 15-minute startup for CLI / Agent / Service
+  - Includes minimum closed loop across local, control plane, and node agent
+  - Best for teams migrating from local-only mode
+
 ### 📚 Production Handbook
 
 - **[Cookbook (cookbook-compose.md)](cookbook-compose.md)** - 7 real-world production scenarios
@@ -21,6 +25,15 @@
   - Scenario 6: Using Docker Hub images
   - Scenario 7: Windows + Task Scheduler automation
   - Bonus: Complete troubleshooting guide
+
+- **[Layered Cookbook (cookbook-layered.md)](cookbook-layered.md)** - real scenarios organized by runtime layer
+  - CLI: onboarding and daily checks
+  - Service: orchestration, dedupe, and webhook delivery
+  - Agent: signed polling, result reporting, replay defense
+
+- **[Layered Manual (manual-layered.md)](manual-layered.md)** - parameter model and protocol contracts
+  - config parameter impact map
+  - API contracts, state machine, concurrency and security baseline
 
 ### ⚡ DNS Provider Documentation
 
@@ -38,33 +51,46 @@
 
 ## Recommended Reading Path
 
-**First-time users (15 minutes)**
+### First-time users (15 minutes)
+
 1. Read main README (overview)
 2. Follow Quick Guide with examples
-3. Optional: Compare with Cookbook Scenario 1
+3. Run Layered Quick Guide for full CLI/Agent/Service flow
+4. Optional: Compare with Cookbook Scenario 1
 
-**Production deployment (30 minutes)**
-1. Quick Guide + relevant Cookbook scenarios (pick 2-3)
-2. DNS Provider configuration
-3. If using K8s: Scenario 5 + k8s-service-design.md
+### Production deployment (30 minutes)
 
-**Troubleshooting**
+1. Quick Guide + Layered Cookbook scenarios (pick 2-3)
+2. Layered Manual for parameter and boundary controls
+3. DNS Provider configuration
+4. If using K8s: Scenario 5 + k8s-service-design.md
+
+### Troubleshooting
+
 → Jump to Cookbook "Troubleshooting Guide" section
 
 ---
 
 ## File Structure
 
-```
+```text
 docs/
 ├── zh-CN/                          # Chinese documentation
 │   ├── README.md
 │   ├── quickguide-docker-compose.md
-│   └── cookbook-compose.md
+│   ├── cookbook-compose.md
+│   ├── quickguide-layered.md
+│   ├── cookbook-layered.md
+│   ├── manual-layered.md
+│   └── dns-providers.md
 ├── en/                             # English documentation (← you are here)
 │   ├── README.md
 │   ├── quickguide-docker-compose.md
-│   └── cookbook-compose.md
+│   ├── cookbook-compose.md
+│   ├── quickguide-layered.md
+│   ├── cookbook-layered.md
+│   ├── manual-layered.md
+│   └── dns-providers.md
 ├── dns-providers.md                # Shared (referenced by all)
 ├── k8s-service-design.md           # Shared
 └── notes/, plans/                  # Internal notes
@@ -77,6 +103,9 @@ docs/
 - 🔗 [Main README](../../README.md)
 - 🔗 [Quick Start Guide](quickguide-docker-compose.md)
 - 🔗 [Production Scenarios](cookbook-compose.md)
+- 🔗 [Layered Quick Guide](quickguide-layered.md)
+- 🔗 [Layered Cookbook](cookbook-layered.md)
+- 🔗 [Layered Manual](manual-layered.md)
 - 🔗 [Provider Setup](../dns-providers.md)
 
 ---
@@ -84,7 +113,7 @@ docs/
 ## Contributing
 
 To add or translate documentation:
+
 1. English docs go in `docs/en/`
 2. Chinese docs go in `docs/zh-CN/`
 3. Keep shared content (dns-providers.md, k8s-service-design.md) in `docs/`
-

@@ -6,29 +6,16 @@ from pathlib import Path
 
 import typer
 
-from certman.config import create_runtime
-from certman.exporter import EXPORT_FILES, export_entry
+from certman.config import create_runtime, entry_domains
 from certman.logging_ import cleanup_logs
 from certman.runtime_logging import new_run_logfile
 from certman.services.cert_service import CertService, resolve_entry_cert_name
-
-
-def _entry_domains(entry) -> list[str]:
-    domains = [entry.primary_domain, *entry.secondary_domains]
-    if entry.wildcard:
-        domains.append(f"*.{entry.primary_domain}")
-    # de-dup while preserving order
-    seen: set[str] = set()
-    unique: list[str] = []
-    for d in domains:
-        if d in seen:
-            continue
-        seen.add(d)
-        unique.append(d)
-    return unique
+from certman.services.export_service import ExportService
 
 
 app = typer.Typer(add_completion=False)
+
+_export_service = ExportService()
 
 
 @app.callback()
@@ -83,7 +70,7 @@ def entries(ctx: typer.Context):
     """List merged entries from config."""
     runtime = ctx.obj
     for entry in runtime.config.entries:
-        domains = _entry_domains(entry)
+        domains = entry_domains(entry)
         typer.echo(
             f"{entry.name}\tprovider={entry.dns_provider}\tprimary={entry.primary_domain}\tdomains={','.join(domains)}"
         )
@@ -252,18 +239,18 @@ def export(
 
         live_dir = letsencrypt_dir / "live" / cert_name
         out_dir = runtime.paths.output_dir / entry.name
-        missing_source_files = [name for name in EXPORT_FILES if not (live_dir / name).exists()]
-        if missing_source_files:
-            failed_entries.append(
-                f"entry={entry.name} missing_source_files={','.join(missing_source_files)}"
-            )
-            continue
-
-        copied = export_entry(
+        export_result = _export_service.export_from_live(
             letsencrypt_live_dir=live_dir,
             output_entry_dir=out_dir,
             overwrite=overwrite,
         )
+        if not export_result.success:
+            failed_entries.append(
+                f"entry={entry.name} {export_result.error or 'export failed'}"
+            )
+            continue
+
+        copied = export_result.copied_paths
         copied_total += len(copied)
         copied_paths.extend(copied)
         if not copied:

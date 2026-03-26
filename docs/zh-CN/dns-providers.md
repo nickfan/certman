@@ -6,7 +6,7 @@ This project supports three DNS providers for DNS-01 certificate issuance:
 - Cloudflare DNS
 - AWS Route53
 
-All required certbot plugins are managed in [pyproject.toml](../pyproject.toml) and installed via `uv sync` or `uv add`.
+All required certbot plugins are managed in [pyproject.toml](../../pyproject.toml) and installed via `uv sync` or `uv add`.
 
 ## Common Flow
 

@@ -11,6 +11,9 @@
 # - Templates use suffix `.example.toml` and are not loaded
 # - Put secrets in data/conf/.env (optional; see .env.example)
 
+# Runtime mode: "local" | "agent" | "server"
+run_mode = "local"
+
 [global]
 # Base data directory. In docker-compose, this will be /data.
 data_dir = "data"
@@ -34,3 +37,28 @@ letsencrypt_dir = "letsencrypt"
 #
 # Note: templates use the suffix `.example.toml` and are excluded by default.
 scan_items_glob = "item_*.toml"
+
+# Agent mode example:
+# [control_plane]
+# endpoint = "https://certman.example.com"
+# poll_interval_seconds = 30
+#
+# [node_identity]
+# node_id = "node-a"
+# private_key_path = "run/keys/node-a.pem"
+# public_key_path = "run/keys/node-a.pub"
+# certificate_store_path = "run/certs"
+
+# Server mode example:
+# [server]
+# db_path = "data/run/certman.db"
+# listen_host = "0.0.0.0"
+# listen_port = 8000
+# signing_key_path = "run/keys/server.pem"
+
+# Optional hooks (shared by local/agent/server where applicable)
+# [[hooks]]
+# name = "reload-nginx"
+# event = "certificate.updated"
+# command = "nginx -s reload"
+# shell = true

@@ -8,9 +8,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN pip install --no-cache-dir uv
 
 COPY pyproject.toml uv.lock README.md /app/
+COPY alembic.ini /app/alembic.ini
+COPY alembic /app/alembic
 COPY certman /app/certman
 COPY main.py /app/main.py
 
-RUN uv sync --frozen
+RUN uv sync --frozen --no-dev
 
 ENTRYPOINT ["uv", "run", "certman"]

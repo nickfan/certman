@@ -273,19 +273,19 @@ erDiagram
 以下设计约束在进入 Phase 2 编码前必须冻结，Phase 4 实现。不采用 shared secret 过渡方案。
 
 1. **节点注册与信任建立**
-   - Agent 首次连接时提交 Ed25519 公鑰。
+   - Agent 首次连接时提交 Ed25519 公钥。
    - Server 侧管理员确认（approve）后节点进入 active 状态。
    - 未 approved 节点的 poll 请求返回 403。
 
 2. **签名字段与验签边界**
    - Agent → Server: 对 `{node_id, timestamp, nonce, payload_hash}` 做 Ed25519 签名。
-   - Server → Agent: 对 bundle 做 Ed25519 签名，Agent 用 server 公鑰验签。
+   - Server → Agent: 对 bundle 做 Ed25519 签名，Agent 用 server 公钥验签。
 
 3. **bundle 下载授权**
    - Agent 仅能下载 `node_id` 匹配的 bundle。
    - Server 在 bundle URL 中嵌入短时效 token（或使用签名请求验证）。
 
-4. **失败事件寡计**
+4. **失败事件审计**
    - 签名验证失败、解密失败、未授权 poll 均写入 AUDIT_EVENT。
 
 ### 6.8 错误处理策略
@@ -321,12 +321,12 @@ erDiagram
 
 1. `server.db_path`（或 `database.url`）存在且可写入
 2. `server.listen_host` + `server.listen_port` 配置存在
-3. `server.signing_key_path` 存在（Ed25519 私鑰，用于签名 Agent 响应）
+3. `server.signing_key_path` 存在（Ed25519 私钥，用于签名 Agent 响应）
 
 配置边界应拆分而非复用同一对象:
 
 - 保留 `control_plane.endpoint` 仅用于 `agent` 模式
-- 新增独立 `server`（或 `api` + `database`）配置块承载监听地址、数据库路径、签名私鑰
+- 新增独立 `server`（或 `api` + `database`）配置块承载监听地址、数据库路径、签名私钥
 - `_validate_run_mode` 分别校验 agent/server 所需字段，避免把 server 运行配置塞入 `ControlPlaneConfig`
 
 长任务统一语义：
@@ -352,3 +352,4 @@ erDiagram
 - 集成测试：API + DB + Worker。
 - 端到端最小闭环：server + agent + filesystem delivery。
 - 覆盖率目标：>= 80%。
+

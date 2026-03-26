@@ -5,6 +5,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from certman.cli import app
+from certman.services.export_service import ExportResult
 
 
 def test_new_command_delegates_to_service_and_export(monkeypatch, tmp_path: Path) -> None:
@@ -495,14 +496,13 @@ entries:
     )
 
     captured: dict[str, Path] = {}
-    monkeypatch.setattr("certman.cli.EXPORT_FILES", [])
 
-    def fake_export_entry(*, letsencrypt_live_dir, output_entry_dir, overwrite):
+    def fake_export_from_live(*, letsencrypt_live_dir, output_entry_dir, overwrite):
         captured["live_dir"] = letsencrypt_live_dir
         captured["output_dir"] = output_entry_dir
-        return []
+        return ExportResult(success=True, copied_paths=[])
 
-    monkeypatch.setattr("certman.cli.export_entry", fake_export_entry)
+    monkeypatch.setattr("certman.cli._export_service.export_from_live", fake_export_from_live)
 
     runner = CliRunner()
     result = runner.invoke(
@@ -547,11 +547,10 @@ entries:
     (renewal_dir / "example.com-0001.conf").write_text("x", encoding="utf-8")
     live_dir = data_dir / "run" / "letsencrypt" / "live" / "example.com-0001"
     live_dir.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setattr("certman.cli.EXPORT_FILES", ["cert.pem"])
     (live_dir / "cert.pem").write_text("dummy", encoding="utf-8")
     monkeypatch.setattr(
-        "certman.cli.export_entry",
-        lambda **kwargs: [Path("data/output/site-a/cert.pem")],
+        "certman.cli._export_service.export_from_live",
+        lambda **kwargs: ExportResult(success=True, copied_paths=[Path("data/output/site-a/cert.pem")]),
     )
 
     runner = CliRunner()
@@ -600,12 +599,13 @@ entries:
     (renewal_dir / "a.example.com-0001.conf").write_text("x", encoding="utf-8")
     (renewal_dir / "b.example.com-0001.conf").write_text("x", encoding="utf-8")
 
-    monkeypatch.setattr("certman.cli.EXPORT_FILES", ["cert.pem", "chain.pem"])
-
-    def fake_export_entry(*, letsencrypt_live_dir, output_entry_dir, overwrite):
+    def fake_export_from_live(*, letsencrypt_live_dir, output_entry_dir, overwrite):
         if letsencrypt_live_dir.as_posix().endswith("a.example.com-0001"):
-            return [Path("data/output/site-a/cert.pem"), Path("data/output/site-a/chain.pem")]
-        return []
+            return ExportResult(
+                success=True,
+                copied_paths=[Path("data/output/site-a/cert.pem"), Path("data/output/site-a/chain.pem")],
+            )
+        return ExportResult(success=True, copied_paths=[])
 
     for cert_name in ["a.example.com-0001", "b.example.com-0001"]:
         live_dir = data_dir / "run" / "letsencrypt" / "live" / cert_name
@@ -614,7 +614,7 @@ entries:
             (live_dir / "cert.pem").write_text("dummy", encoding="utf-8")
             (live_dir / "chain.pem").write_text("dummy", encoding="utf-8")
 
-    monkeypatch.setattr("certman.cli.export_entry", fake_export_entry)
+    monkeypatch.setattr("certman.cli._export_service.export_from_live", fake_export_from_live)
 
     runner = CliRunner()
     result = runner.invoke(
@@ -631,7 +631,7 @@ entries:
 
     assert result.exit_code == 1
     assert "Exported 2 file(s)" in result.stdout
-    assert "entry=site-b missing_source_files=cert.pem,chain.pem" in result.stdout
+    assert "entry=site-b no files exported" in result.stdout
 
 
 def test_export_no_overwrite_succeeds_when_output_already_exists(monkeypatch, tmp_path: Path) -> None:

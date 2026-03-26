@@ -63,6 +63,9 @@ def load_merged_config(global_config_path: Path) -> AppConfig:
         "hooks": [hook.model_dump() for hook in base_cfg.hooks],
     }
 
+    if base_cfg.server is not None:
+        merged_dict["server"] = base_cfg.server.model_dump()
+
     return AppConfig.model_validate(merged_dict)
 
 

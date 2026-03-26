@@ -600,3 +600,115 @@ CertMan 应该被定义为：
 2. 从“同步 TLS Secret”升级为“多目标分发框架”
 3. 从“API Key + 普通下载”升级为“节点身份 + 加密内容分发”
 4. 从“仅 CLI 封装”升级为“CLI、Agent、Control Plane 共用核心内核”
+
+---
+
+## 14. 当前实装状态（2026-03-26）
+
+### 14.1 已实装功能
+
+#### CLI / 本地自治模式
+- ✅ `certman` 命令及配置系统（TOML/YAML，支持 entry、hook、provider）
+- ✅ 本地证书生命周期（issue/renew/check/export）
+- ✅ 多 provider 支持（cloudflare、route53、aliyun）
+- ✅ Hook 执行框架（shell 命令触发）
+- ✅ 本地自治模式配置验证
+
+#### 控制平面服务器
+- ✅ FastAPI HTTP Server (`certman-server`)
+- ✅ 配置系统升级为 server mode（`run_mode="server"`）
+- ✅ SQLAlchemy 数据库层（Alembic migration）
+- ✅ Job 模型与队列系统（issue/renew type）
+- ✅ Health endpoint (`GET /health`)
+
+#### 核心 API 端点（Phase 4）
+| 端点 | 实装状态 | 备注 |
+|------|--------|------|
+| `POST /api/v1/certificates` | ✅ 完成 | 创建 issue job，返回 job_id，202 Accepted |
+| `GET /api/v1/jobs/{job_id}` | ✅ 完成 | 查询 job 状态（queued/claimed/completed/failed） |
+| `POST /api/v1/webhooks` | ✅ 完成 | 创建 webhook 订阅，支持签名验证 |
+| `POST /api/v1/nodes/register` | ⏳ 实装中 | 节点使用一次性 token 注册 |
+
+#### 安全与身份认证
+- ✅ Ed25519 签名密钥对支持（在 server config 中）
+- ✅ 消息签名与验证框架（Node-Agent 通信）
+- ✅ Nonce 与 sequence 重放防护（已实装在 agent 模型）
+
+#### 后台工作进程
+- ✅ `certman-worker` 进程（--loop 模式）
+- ✅ Job 声明与处理（claim_next_job）
+- ✅ 异步任务驱动（30s 轮询间隔可配）
+- ✅ Event 发布/订阅基础框架
+
+#### 事件驱动能力
+- ✅ EventBus 框架（内存实装）
+- ✅ Webhook 订阅表与投递框架
+- ✅ Job 事件发布（job.queued/completed/failed）
+
+#### Docker & Kubernetes 部署
+- ✅ Docker 镜像构建（Dockerfile 完整）
+- ✅ Docker Compose 支持（3 个服务 + volume + network）
+- ✅ Kubernetes 部署清单（配置、PVC、Deployment、Service）
+- ✅ Kind 1.34 成功演练及运行验证
+
+### 14.2 进行中/部分实装
+
+| 功能 | 状态 | 说明 |
+|------|------|------|
+| Node Registry Service | ⏳ 框架就位 | 数据库表已定义，API 端点待完成 |
+| Credential Vault | ⏳ 基础实装 | 支持嵌入式 + 环境变量，长期 vault 服务待规划 |
+| Distribution Orchestrator | ⏳ 骨架设计 | Job 类型框架就位（distribute），具体算法待完成 |
+| Audit Logging | ⏳ 路由级记录 | 基础 HTTP 日志，精细审计日志待增强 |
+| Webhook 重试 & 死信队列 | ⏳ 设计完成 | 基础框架存在，完整重试策略待优化 |
+
+### 14.3 待规划/设计中
+
+| 功能 | 优先级 | 说明 |
+|------|--------|------|
+| Agent 节点模式 | 高 | 节点侧执行引擎、任务拉取、本地写入 |
+| 证书分发到 K8s Secret | 高 | 与通过 kubeconfig 的远端集群交互 |
+| 证书分发到对象存储 | 中 | S3/OSS 分发适配器 |
+| OIDC/RBAC 用户认证 | 中 | 管理 API 的用户级访问控制 |
+| 内容加密（信封加密） | 中 | AES-256-GCM + RSA/Ed25519 包装 |
+| mTLS 节点通信 | 中 | 客户端证书颁发与验证 |
+| 全链路审计与合规 | 低 | 详细的操作->结果追踪与告警 |
+
+### 14.4 验证矩阵
+
+#### 本地运行验证（✅ PASS）
+```
+pytest -q --tb=short        → 78/78 PASSED
+docker build -t certman:local . → SUCCESS
+docker compose up -d        → 3 services running
+docker compose API smoke    → /health 200, /api/v1/certificates 404 (entry not found)
+```
+
+#### Kubernetes 验证（✅ PASS on Kind 1.34）
+```
+kind create cluster --image kindest/node:v1.34.0  → Created
+kind load docker-image certman:local               → Loaded
+kubectl apply -f k8s-rehearsal.yaml                → All objects created
+Pod:  certman-server-xxx Ready=1/1, Running        → Healthy
+HTTP: kubectl port-forward svc/certman-server 8001:8000
+   GET  /health → 200 OK
+   POST /api/v1/certificates → 404 entry not found (expected)
+```
+
+### 14.5 下一步行动项
+
+**短期（本周）：**
+1. 补充 k8s 部署中的 worker 容器与端到端 job 流验证
+2. 添加完整配置示例（item_site-a.toml）到 ConfigMap
+3. 在 kind 环境中验证 job 从提交 → worker 处理 → 完成的完整链路
+4. 验证 webhook 事件投递（job.queued/completed）
+
+**中期（2 周内）：**
+1. 实装 POST /api/v1/nodes/register 与节点注册表
+2. 实装 agent 节点侧的任务拉取与本地执行框架
+3. 测试受控节点模式下的简单分发
+
+**长期（规划中）：**
+1. Credential Vault 服务化
+2. K8s Secret 分发适配器
+3. 用户认证与 RBAC
+4. 信封加密与 mTLS

@@ -151,3 +151,64 @@ entries:
     runtime = create_runtime(str(tmp_path), "config.yaml")
 
     assert runtime.paths.data_dir == tmp_path.parent / "custom-data"
+
+
+def test_server_mode_requires_server_config_block() -> None:
+    """server 模式缺少 [server] 配置块时应抛出 ValidationError。"""
+    with pytest.raises(ValidationError):
+        AppConfig.model_validate(
+            {
+                "run_mode": "server",
+                "global": {"email": "ops@example.com"},
+                "entries": [],
+            }
+        )
+
+
+def test_server_mode_valid_minimal_config() -> None:
+    """server 模式提供 [server] 块时应成功加载。"""
+    cfg = AppConfig.model_validate(
+        {
+            "run_mode": "server",
+            "global": {"email": "ops@example.com"},
+            "entries": [],
+            "server": {
+                "db_path": "data/run/certman.db",
+                "listen_host": "0.0.0.0",
+                "listen_port": 8000,
+            },
+        }
+    )
+    assert cfg.run_mode == "server"
+    assert cfg.server is not None
+    assert cfg.server.listen_port == 8000
+    assert cfg.server.signing_key_path is None
+
+
+def test_server_mode_round_trips_through_merged_runtime(tmp_path: Path) -> None:
+    """server 模式配置可通过 create_runtime 完整加载。"""
+    conf_dir = tmp_path / "conf"
+    conf_dir.mkdir(parents=True)
+    (conf_dir / "config.toml").write_text(
+        """
+run_mode = "server"
+
+[global]
+data_dir = "data"
+email = "ops@example.com"
+
+[server]
+db_path = "data/run/certman.db"
+listen_host = "127.0.0.1"
+listen_port = 9000
+signing_key_path = "keys/server.pem"
+""".strip(),
+        encoding="utf-8",
+    )
+
+    runtime = create_runtime(str(tmp_path), None)
+
+    assert runtime.config.run_mode == "server"
+    assert runtime.config.server is not None
+    assert runtime.config.server.listen_port == 9000
+    assert runtime.config.server.signing_key_path == "keys/server.pem"
