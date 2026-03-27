@@ -293,3 +293,79 @@ def test_cloudflare_credentials_use_normalized_account_id(monkeypatch: pytest.Mo
     creds = cloudflare_credentials_for_entry(entry)
 
     assert creds.api_token == "cf-token"
+
+
+def test_scheduler_env_fallback_applies_when_config_uses_defaults(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    conf_dir = tmp_path / "conf"
+    conf_dir.mkdir(parents=True)
+    (conf_dir / "config.toml").write_text(
+        """
+run_mode = "server"
+
+[global]
+data_dir = "data"
+email = "ops@example.com"
+
+[server]
+db_path = "data/run/certman.db"
+listen_host = "127.0.0.1"
+listen_port = 8000
+""".strip(),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setenv("CERTMAN_SCHEDULER_ENABLED", "true")
+    monkeypatch.setenv("CERTMAN_SCHEDULER_MODE", "cron")
+    monkeypatch.setenv("CERTMAN_SCHEDULER_CRON_EXPR", "*/5 * * * *")
+    monkeypatch.setenv("CERTMAN_SCHEDULER_RENEW_BEFORE_DAYS", "21")
+
+    runtime = create_runtime(str(tmp_path), None)
+
+    assert runtime.config.scheduler.enabled is True
+    assert runtime.config.scheduler.mode == "cron"
+    assert runtime.config.scheduler.cron_expr == "*/5 * * * *"
+    assert runtime.config.scheduler.renew_before_days == 21
+
+
+def test_scheduler_config_has_priority_over_env_fallback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    conf_dir = tmp_path / "conf"
+    conf_dir.mkdir(parents=True)
+    (conf_dir / "config.toml").write_text(
+        """
+run_mode = "server"
+
+[global]
+data_dir = "data"
+email = "ops@example.com"
+
+[server]
+db_path = "data/run/certman.db"
+listen_host = "127.0.0.1"
+listen_port = 8000
+
+[scheduler]
+enabled = true
+mode = "loop"
+scan_interval_seconds = 99
+renew_before_days = 13
+""".strip(),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setenv("CERTMAN_SCHEDULER_ENABLED", "false")
+    monkeypatch.setenv("CERTMAN_SCHEDULER_MODE", "cron")
+    monkeypatch.setenv("CERTMAN_SCHEDULER_SCAN_INTERVAL_SECONDS", "5")
+    monkeypatch.setenv("CERTMAN_SCHEDULER_RENEW_BEFORE_DAYS", "60")
+
+    runtime = create_runtime(str(tmp_path), None)
+
+    assert runtime.config.scheduler.enabled is True
+    assert runtime.config.scheduler.mode == "loop"
+    assert runtime.config.scheduler.scan_interval_seconds == 99
+    assert runtime.config.scheduler.renew_before_days == 13

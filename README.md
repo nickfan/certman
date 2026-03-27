@@ -12,6 +12,7 @@ CertMan now exposes four runtime surfaces built on the same config and service l
 - `certman-server`: FastAPI control plane for `/health`, job submission, job query, webhook subscription
 - `certman-worker`: background job runner for queued `issue` and `renew` jobs
 - `certman-agent`: node-side polling agent scaffold for controlled execution mode
+- `certman-scheduler`: independent renewal scheduler (loop/cron/once)
 
 Typical local commands:
 
@@ -20,12 +21,15 @@ uv run certman --help
 uv run certman-server --data-dir data --config-file config.toml
 uv run certman-worker --data-dir data --config-file config.toml --once
 uv run certman-agent --data-dir data --config-file config.toml --once
+uv run certman-scheduler run --data-dir data --config-file config.toml --loop
+uv run certman-scheduler once --data-dir data --config-file config.toml --force-enable
 ```
 
 ## Runtime Dependency Matrix
 
 - `certman` (CLI local mode): no dependency on Kubernetes or Docker; can run directly via Python/uv.
 - `certman-server` + `certman-worker`: no dependency on Kubernetes or Docker; Docker is optional for packaging/deploy.
+- `certman-scheduler`: no dependency on Kubernetes or Docker; can run as standalone loop/cron/once process.
 - `certman-agent`: no hard dependency on Kubernetes or Docker, but requires reachable control-plane endpoint.
 - `scripts/certman-docker.ps1` / `scripts/certman-docker.sh`: requires Docker engine because they are docker wrappers.
 
@@ -34,6 +38,7 @@ Direct run examples (no k8s/docker required):
 ```bash
 uv run certman --data-dir data entries
 uv run certman --data-dir data check --warn-days 30 --force-renew-days 7
+uv run certman --data-dir data oneshot-issue -d example.com -d *.example.com -sp aliyun --email ops@example.com --ak <ak> --sk <sk> -o /tmp/example.com
 ```
 
 ```powershell
@@ -120,6 +125,9 @@ docker compose run --rm certman export --all
 
 # 6) start control plane and worker
 docker compose up certman-server certman-worker
+
+# 7) start scheduler (independent process)
+docker compose up certman-server certman-worker certman-scheduler
 ```
 
 Optional scripted e2e validation (compose/k8s):

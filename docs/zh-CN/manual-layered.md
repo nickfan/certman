@@ -15,12 +15,18 @@
 | run_mode | 运行模式 local/agent/server | local | 三层 |
 | global.data_dir | 数据根目录 | data | 三层 |
 | global.acme_server | 证书环境 staging/prod | staging | CLI/Service |
-| global.email | certbot 注册邮箱 | admin@example.com | CLI/Service |
+| global.email | certbot 注册邮箱 | `admin@example.com` | CLI/Service |
 | global.letsencrypt_dir | certbot 状态目录 | letsencrypt | CLI/Service |
 | server.db_path | 控制面数据库 | data/run/certman.db | Service/Agent |
 | server.listen_host | API 监听地址 | 0.0.0.0 | Service |
 | server.listen_port | API 监听端口 | 8000 | Service |
 | server.signing_key_path | 服务端签名私钥 | null | Service/Agent |
+| scheduler.enabled | 调度全局开关 | false | Service/Scheduler |
+| scheduler.mode | 调度模式 loop/cron | loop | Scheduler |
+| scheduler.scan_interval_seconds | loop 间隔秒数 | 300 | Scheduler |
+| scheduler.cron_expr | cron 表达式（5段） | `0 * * * *` | Scheduler |
+| scheduler.cron_poll_seconds | cron 轮询时钟间隔 | 15 | Scheduler |
+| scheduler.renew_before_days | 提前 N 天入队 renew | 30 | Scheduler |
 | control_plane.endpoint | 控制面地址 | 无 | Agent |
 | control_plane.poll_interval_seconds | 轮询周期（秒） | 30 | Agent |
 | node_identity.node_id | 节点唯一标识 | 无 | Agent |
@@ -88,11 +94,31 @@ uv run certman -D data check --warn-days 30 --force-renew-days 7
 
 ### 3.5 export
 
-用途：将 certbot live 目录导出到 data/output/<entry>/。
+用途：将 certbot live 目录导出到 `data/output/entry_name/`。
 
 ```bash
 uv run certman -D data export --name site-a --overwrite
 ```
+
+### 3.6 oneshot-issue / oneshot-renew（纯参数模式）
+
+用于自动化/AI 技能调用，不依赖配置文件：
+
+```bash
+uv run certman -D data oneshot-issue -d example.com -d *.example.com -sp aliyun --email ops@example.com --ak <ak> --sk <sk> -o /tmp/example
+uv run certman -D data oneshot-renew -d example.com -d *.example.com -sp aliyun --email ops@example.com --ak <ak> --sk <sk> -o /tmp/example
+```
+
+provider 凭据要求：
+
+- aliyun/route53：`--ak` + `--sk`
+- cloudflare：`--api-token`
+
+### 3.7 本地 config/env 命令
+
+`certman config`：支持 `list/show/add/edit/remove/init`。
+
+`certman env`：支持 `.env` 的 `list/set/unset`。
 
 ## 4. Service API 手册
 
@@ -188,6 +214,12 @@ POST /api/v1/nodes/register
 - 接收 PEM 编码的 Ed25519 公钥。
 - 返回后续 agent poll 用的 `poll_endpoint`。
 
+### 4.5 只读配置 API
+
+- `GET /api/v1/config/entries`
+- `GET /api/v1/config/entries/{entry_name}`
+- `POST /api/v1/config/validate`
+
 ## 5. Agent 协议手册
 
 ### 5.1 poll
@@ -232,6 +264,7 @@ POST /api/v1/node-agent/result
 - `certmanctl cert create|list|get|renew`
 - `certmanctl job get|list|wait`
 - `certmanctl webhook create|list|get|update|delete`
+- `certmanctl config list|show|validate`
 
 `certmanctl` 本质是 REST 的运维 CLI 封装，适合 shell 自动化和偏命令式的远程操作。
 
@@ -239,6 +272,14 @@ POST /api/v1/node-agent/result
 
 - 本仓库已提供 `certman-mcp` 的 stdio MCP Server。
 - 可通过 `uv run certman-mcp --endpoint http://127.0.0.1:8000` 启动，并作为控制面 REST API 的工具封装层使用。
+
+当前 MCP 工具包含：health、cert_*、job_*、webhook_*、config_list/config_get/config_validate。
+
+## 7.1 Scheduler 运行模式
+
+- 常驻模式：`uv run certman-scheduler run --data-dir data --config-file config.toml --loop`
+- 一次性模式：`uv run certman-scheduler once --data-dir data --config-file config.toml --force-enable`
+- K8s CronJob 示例：`k8s/certman-scheduler-cronjob.yaml`
 
 ## 8. 状态机与并发语义
 

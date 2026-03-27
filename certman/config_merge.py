@@ -61,6 +61,7 @@ def load_merged_config(global_config_path: Path) -> AppConfig:
             base_cfg.node_identity.model_dump() if base_cfg.node_identity else None
         ),
         "hooks": [hook.model_dump() for hook in base_cfg.hooks],
+        "scheduler": base_cfg.scheduler.model_dump(),
     }
 
     if base_cfg.server is not None:

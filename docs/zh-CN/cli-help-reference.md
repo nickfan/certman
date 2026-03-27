@@ -51,10 +51,24 @@ uv run certmanctl webhook update --help
   - `-k, --keep-days`：保留最近 N 天日志
 - `entries`
   - 无命令级参数
+- `config list|show|add|edit|remove|init`
+  - 条目配置与 item/global 存储管理
+- `env list|set|unset`
+  - 管理 `data/conf/.env` 里的 key
 - `config-validate`
   - `-n, --name`：仅校验指定条目（可重复）
   - `--all`：校验全部合并条目
   - 范围规则：必须指定 `--name` 或 `--all`，且两者不可同时使用
+- `oneshot-issue`
+  - `-d, --domain`：可重复，支持通配符
+  - `-sp, --sp, --service-provider`：`aliyun|cloudflare|route53`
+  - `--email`：ACME 账户邮箱
+  - `-o, --output`：证书导出目录
+  - `--ak/--sk` 或 `--api-token`：provider 凭据
+  - 纯参数模式，无需配置文件
+- `oneshot-renew`
+  - 与 `oneshot-issue` 参数基本一致
+  - `--force/--no-force` 控制强制续签语义
 
 ## 3. 远程 CLI（`certmanctl`）参数
 
@@ -101,6 +115,13 @@ Token 说明：
   - `--endpoint-url`：新回调 URL
   - `--secret`：新密钥
   - `--status`：新状态
+- `config list`
+  - 无命令级参数
+- `config show`
+  - `-n, --entry-name`：条目名
+- `config validate`
+  - `-n, --entry-name`：指定条目（可重复）
+  - `--all`：校验全部合并条目
 
 ## 4. Skill 预备建议
 

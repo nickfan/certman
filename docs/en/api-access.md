@@ -25,7 +25,7 @@ Current supported interfaces:
 uv run certman-mcp --endpoint http://127.0.0.1:8000
 ```
 
-The MCP server uses stdio transport and exposes tools for health, certificate jobs, jobs query/wait, and webhook CRUD.
+The MCP server uses stdio transport and exposes tools for health, certificate jobs, jobs query/wait, webhook CRUD, and read-only config query/validate.
 
 Notes:
 
@@ -82,6 +82,30 @@ token = "site-a-token"
 | `webhook get --id <id>` | `GET /api/v1/webhooks/{id}` |
 | `webhook update --id <id>` | `PUT /api/v1/webhooks/{id}` |
 | `webhook delete --id <id>` | `DELETE /api/v1/webhooks/{id}` |
+| `config list` | `GET /api/v1/config/entries` |
+| `config show --entry-name <name>` | `GET /api/v1/config/entries/{entry_name}` |
+| `config validate --entry-name ...` | `POST /api/v1/config/validate` |
+
+## 3.1 `certman-mcp` tools map
+
+| MCP tool | REST endpoint |
+| --- | --- |
+| `health` | `GET /health` |
+| `cert_create` | `POST /api/v1/certificates` |
+| `cert_list` | `GET /api/v1/certificates` |
+| `cert_get` | `GET /api/v1/certificates/{entry_name}` |
+| `cert_renew` | `POST /api/v1/certificates/{entry_name}/renew` |
+| `job_get` | `GET /api/v1/jobs/{job_id}` |
+| `job_list` | `GET /api/v1/jobs?...` |
+| `job_wait` | polling `GET /api/v1/jobs/{job_id}` |
+| `webhook_create` | `POST /api/v1/webhooks` |
+| `webhook_list` | `GET /api/v1/webhooks` |
+| `webhook_get` | `GET /api/v1/webhooks/{id}` |
+| `webhook_update` | `PUT /api/v1/webhooks/{id}` |
+| `webhook_delete` | `DELETE /api/v1/webhooks/{id}` |
+| `config_list` | `GET /api/v1/config/entries` |
+| `config_get` | `GET /api/v1/config/entries/{entry_name}` |
+| `config_validate` | `POST /api/v1/config/validate` |
 
 ## 4. AI integration guidance
 

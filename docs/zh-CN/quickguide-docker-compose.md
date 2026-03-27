@@ -271,6 +271,48 @@ certman/
 
 ---
 
+## 9. 纯参数 one-shot 模式（无配置文件）
+
+面向自动化/Skill 调用，可完全不依赖 `config.toml` / `item_*.toml`：
+
+```bash
+# 一次性签发
+uv run certman --data-dir data oneshot-issue \
+  -d mydemo1.com -d *.mydemo1.com \
+  -sp route53 \
+  --email alice@mydemo1.com \
+  --ak <aws-ak> --sk <aws-sk> \
+  --aws-region us-east-1 \
+  -o /tmp/mydemo1
+
+# 一次性续签
+uv run certman --data-dir data oneshot-renew \
+  -d mydemo1.com -d *.mydemo1.com \
+  -sp route53 \
+  --email alice@mydemo1.com \
+  --ak <aws-ak> --sk <aws-sk> \
+  --aws-region us-east-1 \
+  -o /tmp/mydemo1
+```
+
+---
+
+## 10. 独立 Scheduler 用法（常驻 + 一次性）
+
+Scheduler 独立于 `certman-server` 进程，推荐与 worker 搭配运行：
+
+```bash
+# 常驻调度
+docker compose up certman-server certman-worker certman-scheduler
+
+# 一次性触发（供外部 Cron/Task Scheduler 调用）
+docker compose run --rm certman-scheduler once --force-enable
+```
+
+Kubernetes 也可使用 CronJob 一次性调度：`k8s/certman-scheduler-cronjob.yaml`。
+
+---
+
 ## 下一步
 
 - 多域名？在 `data/conf/` 中添加 `item_otherdomain.toml`，重复步骤 2-7

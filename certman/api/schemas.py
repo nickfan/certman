@@ -224,3 +224,22 @@ class NodeRegisterRequest(BaseModel):
             }
         }
     )
+
+
+class ConfigEntryResponse(BaseModel):
+    name: str
+    description: str = ""
+    primary_domain: str
+    secondary_domains: list[str] = Field(default_factory=list)
+    wildcard: bool = True
+    dns_provider: str
+    account_id: str | None = None
+
+
+class ConfigValidateRequest(BaseModel):
+    entry_names: list[str] = Field(default_factory=list)
+    validate_all: bool = False
+
+
+class ConfigValidateResponse(BaseModel):
+    ok: bool = True

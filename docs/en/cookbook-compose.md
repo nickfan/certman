@@ -4,32 +4,77 @@
 
 This cookbook is currently being translated from Chinese. For complete production scenarios and examples, please refer to the **[Chinese version](../zh-CN/cookbook-compose.md)**.
 
+## 2026-03-27 Update Highlights
+
+### 1. Independent Scheduler patterns
+
+Scheduler is now a dedicated runtime surface (`certman-scheduler`) and can run in two production patterns:
+
+```bash
+# Long-running scheduler process
+docker compose up certman-server certman-worker certman-scheduler
+
+# One-shot scheduler trigger (for cron/system schedulers)
+docker compose run --rm certman-scheduler once --force-enable
+```
+
+Kubernetes CronJob alternative is available at:
+
+- `k8s/certman-scheduler-cronjob.yaml`
+
+### 2. One-shot pure CLI mode for AI automation
+
+For integration with AI skills or job runners, use pure-parameter commands without config files:
+
+```bash
+uv run certman --data-dir data oneshot-issue -d example.com -d *.example.com -sp aliyun --email ops@example.com --ak <ak> --sk <sk> -o /tmp/example
+uv run certman --data-dir data oneshot-renew -d example.com -d *.example.com -sp aliyun --email ops@example.com --ak <ak> --sk <sk> -o /tmp/example
+```
+
+### 3. Control-plane read-only config operations
+
+`certmanctl` and `certman-mcp` now support read-only config query/validate:
+
+```bash
+uv run certmanctl --endpoint http://127.0.0.1:8000 config list
+uv run certmanctl --endpoint http://127.0.0.1:8000 config show --entry-name site-a
+uv run certmanctl --endpoint http://127.0.0.1:8000 config validate --entry-name site-a
+```
+
 ## Overview (English)
 
 This handbook covers 7 real-world production scenarios:
 
 ### Scenario 1: Adding a New API Domain
+
 Requesting and configuring SSL certificates for a new service domain on Route53.
 
 ### Scenario 2: Daily Monitoring Alerts
+
 Setting up monitoring without automatic remediation - useful for auditing and manual approval workflows.
 
 ### Scenario 3: Full Automation
+
 Implementing complete hands-off certificate renewal with Cron jobs or Kubernetes CronJobs.
 
 ### Scenario 4: Multi-Provider Management
+
 Managing domains across different DNS providers (Route53, Cloudflare, Aliyun) in a single instance.
 
 ### Scenario 5: Kubernetes Integration
+
 Exporting certificates and updating Kubernetes Ingress TLS secrets automatically.
 
 ### Scenario 6: Docker Hub Images
+
 Using pre-built Docker Hub images instead of local builds.
 
 ### Scenario 7: Windows Automation
+
 Setting up Windows Task Scheduler for automatic certificate renewal on Windows Server.
 
 ### Bonus: Complete Troubleshooting Guide
+
 6 common issues with diagnostic steps and solutions.
 
 ## Links
@@ -64,6 +109,7 @@ docker compose run --rm certman check --warn-days 30 --force-renew-days 7 --fix
 ```
 
 ### Exit Codes
+
 - `0`: OK
 - `10`: Warning (expires within 30 days)
 - `20`: Renewal needed

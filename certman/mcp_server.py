@@ -202,6 +202,25 @@ def create_mcp_server(config: McpServerConfig):
         """Delete one webhook subscription."""
         return _call_api(method="DELETE", path=f"/api/v1/webhooks/{_path_segment(subscription_id)}", config=config)
 
+    @mcp.tool()
+    def config_list() -> list[dict[str, Any]]:
+        """List merged config entries (read-only)."""
+        return _call_api(method="GET", path="/api/v1/config/entries", config=config)
+
+    @mcp.tool()
+    def config_get(entry_name: str) -> dict[str, Any]:
+        """Get one merged config entry by name (read-only)."""
+        return _call_api(method="GET", path=f"/api/v1/config/entries/{_path_segment(entry_name)}", config=config)
+
+    @mcp.tool()
+    def config_validate(entry_names: list[str] | None = None, validate_all: bool = False) -> dict[str, Any]:
+        """Validate required secrets for selected entries (read-only check)."""
+        payload = {
+            "entry_names": list(entry_names or []),
+            "validate_all": validate_all,
+        }
+        return _call_api(method="POST", path="/api/v1/config/validate", payload=payload, config=config)
+
     return mcp
 
 

@@ -217,3 +217,59 @@ def test_ctl_job_list_uses_query_params_dict(monkeypatch) -> None:
         "path": "/api/v1/jobs",
         "params": {"subject_id": "a&b", "status": "running", "limit": 7},
     }
+
+
+def test_ctl_config_list_calls_readonly_endpoint(monkeypatch) -> None:
+    observed: dict[str, str] = {}
+
+    def fake_call(*, method: str, path: str, endpoint: str, timeout: float, token: str | None, payload=None, params=None):
+        observed["method"] = method
+        observed["path"] = path
+        return []
+
+    monkeypatch.setattr("certman.ctl.cli._call_api", fake_call)
+
+    result = runner.invoke(app, ["config", "list"])
+
+    assert result.exit_code == 0
+    assert observed == {"method": "GET", "path": "/api/v1/config/entries"}
+
+
+def test_ctl_config_show_url_encodes_entry_name(monkeypatch) -> None:
+    observed: dict[str, str] = {}
+
+    def fake_call(*, method: str, path: str, endpoint: str, timeout: float, token: str | None, payload=None, params=None):
+        observed["method"] = method
+        observed["path"] = path
+        return {"name": "site-a"}
+
+    monkeypatch.setattr("certman.ctl.cli._call_api", fake_call)
+
+    result = runner.invoke(app, ["config", "show", "--entry-name", "site/a b"])
+
+    assert result.exit_code == 0
+    assert observed == {
+        "method": "GET",
+        "path": "/api/v1/config/entries/site%2Fa%20b",
+    }
+
+
+def test_ctl_config_validate_payload(monkeypatch) -> None:
+    observed: dict[str, object] = {}
+
+    def fake_call(*, method: str, path: str, endpoint: str, timeout: float, token: str | None, payload=None, params=None):
+        observed["method"] = method
+        observed["path"] = path
+        observed["payload"] = payload
+        return {"ok": True}
+
+    monkeypatch.setattr("certman.ctl.cli._call_api", fake_call)
+
+    result = runner.invoke(app, ["config", "validate", "--entry-name", "site-a", "--entry-name", "site-b"])
+
+    assert result.exit_code == 0
+    assert observed == {
+        "method": "POST",
+        "path": "/api/v1/config/validate",
+        "payload": {"entry_names": ["site-a", "site-b"], "validate_all": False},
+    }

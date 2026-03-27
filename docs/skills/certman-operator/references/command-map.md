@@ -11,11 +11,20 @@ Commands:
 
 - `entries`
 - `config-validate`
+- `config list|show|add|edit|remove|init`
+- `env list|set|unset`
 - `logs-clean --keep-days <n>`
 - `new --name <entry> [--force] [--export|--no-export] [--verbose]`
 - `renew [--all|--name <entry>] [--force] [--dry-run] [--export|--no-export] [--verbose]`
 - `export [--all|--name <entry>] [--overwrite|--no-overwrite]`
 - `check [--warn-days <n>] [--force-renew-days <n>] [--name <entry>] [--fix] [--json]`
+- `oneshot-issue -d <domain>... -sp <provider> --email <email> -o <output> [--ak <ak> --sk <sk> | --api-token <token>]`
+- `oneshot-renew -d <domain>... -sp <provider> --email <email> -o <output> [--ak <ak> --sk <sk> | --api-token <token>]`
+
+## Scheduler surface: certman-scheduler
+
+- `run --loop|--once [--force-enable] [--renew-before-days <n>]`
+- `once [--force-enable] [--renew-before-days <n>]`
 
 ## Remote surface: certmanctl
 
@@ -47,6 +56,9 @@ Commands:
 - `webhook get --id <id>`
 - `webhook update --id <id> [--endpoint-url <url>] [--secret <value>] [--status <value>]`
 - `webhook delete --id <id>`
+- `config list`
+- `config show --entry-name <entry>`
+- `config validate [--entry-name <entry>...] [--all]`
 
 ## MCP surface: certman-mcp
 
@@ -65,3 +77,4 @@ Tools:
 - `cert_create`, `cert_list`, `cert_get`, `cert_renew`
 - `job_get`, `job_list`, `job_wait`
 - `webhook_create`, `webhook_list`, `webhook_get`, `webhook_update`, `webhook_delete`
+- `config_list`, `config_get`, `config_validate`

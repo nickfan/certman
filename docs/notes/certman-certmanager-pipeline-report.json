@@ -1,0 +1,39 @@
+{
+  "timestamp": "2026-03-27T06:05:27.994514+00:00",
+  "mode": "certman",
+  "entry": "kumaxiong",
+  "summary": {
+    "total": 3,
+    "passed": 3,
+    "failed": 0
+  },
+  "steps": [
+    {
+      "name": "certman config-validate",
+      "command": "docker compose --profile local-linuxfs run --rm certman-linuxfs config-validate --name kumaxiong",
+      "ok": true,
+      "returncode": 0,
+      "started_at": "2026-03-27T05:59:51.588224+00:00",
+      "ended_at": "2026-03-27T06:00:00.965767+00:00",
+      "error_hint": null
+    },
+    {
+      "name": "certman new",
+      "command": "docker compose --profile local-linuxfs run --rm certman-linuxfs new --name kumaxiong --no-export",
+      "ok": true,
+      "returncode": 0,
+      "started_at": "2026-03-27T06:00:00.966305+00:00",
+      "ended_at": "2026-03-27T06:00:14.462215+00:00",
+      "error_hint": null
+    },
+    {
+      "name": "certman renew dry-run",
+      "command": "docker compose --profile local-linuxfs run --rm certman-linuxfs renew --name kumaxiong --dry-run --no-export",
+      "ok": true,
+      "returncode": 0,
+      "started_at": "2026-03-27T06:00:14.462215+00:00",
+      "ended_at": "2026-03-27T06:05:27.993366+00:00",
+      "error_hint": null
+    }
+  ]
+}

@@ -51,10 +51,24 @@ Command options:
   - `-k, --keep-days`: Keep latest N days logs
 - `entries`
   - no command-specific options
+- `config list|show|add|edit|remove|init`
+  - entry-level config and item/global storage management
+- `env list|set|unset`
+  - `.env` key management under `data/conf/.env`
 - `config-validate`
   - `-n, --name`: validate only specified entry (repeatable)
   - `--all`: validate all merged entries
   - scope rule: must provide `--name` or `--all`; cannot combine both
+- `oneshot-issue`
+  - `-d, --domain`: repeatable domains (supports wildcard)
+  - `-sp, --sp, --service-provider`: `aliyun|cloudflare|route53`
+  - `--email`: ACME account email
+  - `-o, --output`: output directory for exported artifacts
+  - `--ak/--sk` or `--api-token`: provider credentials
+  - no config file dependency (pure parameter mode)
+- `oneshot-renew`
+  - same core parameters as `oneshot-issue`
+  - `--force/--no-force` toggles force-renew semantics
 
 ## 3. Remote CLI (`certmanctl`) parameters
 
@@ -101,6 +115,13 @@ Command options:
   - `--endpoint-url`: new callback URL
   - `--secret`: new secret
   - `--status`: new status
+- `config list`
+  - no command-specific options
+- `config show`
+  - `-n, --entry-name`: entry name
+- `config validate`
+  - `-n, --entry-name`: selected entries (repeatable)
+  - `--all`: validate all merged entries
 
 ## 4. Skill preparation notes
 

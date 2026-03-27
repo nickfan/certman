@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import HTTPException
 
 from certman.api.routes.certificates import router as certificates_router
+from certman.api.routes.config import router as config_router
 from certman.api.routes.health import router as health_router
 from certman.api.routes.jobs import router as jobs_router
 from certman.api.routes.nodes import router as nodes_router
@@ -22,6 +23,7 @@ OPENAPI_TAGS = [
     {"name": "webhooks", "description": "Webhook subscription management APIs."},
     {"name": "nodes", "description": "Node registration APIs."},
     {"name": "node-agent", "description": "Signed polling and result reporting APIs for node agents."},
+    {"name": "config", "description": "Read-only merged config query and validation APIs."},
 ]
 
 
@@ -67,6 +69,7 @@ def create_app(*, data_dir: str = "data", config_file: str | None = None) -> Fas
     app.state.event_bus = event_bus
     app.state.webhook_service = webhook_service
     app.include_router(health_router)
+    app.include_router(config_router)
     app.include_router(certificates_router)
     app.include_router(jobs_router)
     app.include_router(nodes_router)

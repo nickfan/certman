@@ -24,9 +24,11 @@ app = typer.Typer(
 cert_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Certificate job commands")
 job_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Job query and wait commands")
 webhook_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Webhook subscription commands")
+config_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Read-only config commands")
 app.add_typer(cert_app, name="cert")
 app.add_typer(job_app, name="job")
 app.add_typer(webhook_app, name="webhook")
+app.add_typer(config_app, name="config")
 
 
 @dataclass(frozen=True)
@@ -377,6 +379,44 @@ def webhook_delete(
 ) -> None:
     """Delete a webhook subscription."""
     _run_or_exit(ctx, method="DELETE", path=f"/api/v1/webhooks/{_path_segment(subscription_id)}")
+
+
+# ---------------------------------------------------------------------------
+# config commands
+# ---------------------------------------------------------------------------
+
+@config_app.command("list")
+def config_list(ctx: typer.Context) -> None:
+    """List merged configuration entries (read-only)."""
+    _run_or_exit(ctx, method="GET", path="/api/v1/config/entries")
+
+
+@config_app.command("show")
+def config_show(
+    ctx: typer.Context,
+    entry_name: str = typer.Option(..., "--entry-name", "-n", help="Entry name"),
+) -> None:
+    """Show one merged configuration entry (read-only)."""
+    _run_or_exit(ctx, method="GET", path=f"/api/v1/config/entries/{_path_segment(entry_name)}")
+
+
+@config_app.command("validate")
+def config_validate(
+    ctx: typer.Context,
+    entry_name: list[str] = typer.Option(None, "--entry-name", "-n", help="Validate selected entries; repeatable"),
+    all: bool = typer.Option(False, "--all", help="Validate all entries"),
+) -> None:
+    """Validate required environment keys on server runtime config (read-only)."""
+    if all and entry_name:
+        raise typer.BadParameter("cannot combine --all with --entry-name")
+    if not all and not entry_name:
+        raise typer.BadParameter("must specify at least one --entry-name or use --all")
+    _run_or_exit(
+        ctx,
+        method="POST",
+        path="/api/v1/config/validate",
+        payload={"entry_names": list(entry_name or []), "validate_all": all},
+    )
 
 
 def main() -> None:

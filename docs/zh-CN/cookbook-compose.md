@@ -2,6 +2,42 @@
 
 本手册根据真实生产场景提供可直接复制的完整示例（包括配置文件）。
 
+## 2026-03-27 重要更新
+
+### 1. 独立 Scheduler 调度模式
+
+Scheduler 现已独立为 `certman-scheduler` 运行面，支持常驻与一次性触发：
+
+```bash
+# 常驻调度进程
+docker compose up certman-server certman-worker certman-scheduler
+
+# 一次性触发（供 cron/task scheduler 调用）
+docker compose run --rm certman-scheduler once --force-enable
+```
+
+Kubernetes 一次性调度示例清单：
+
+- `k8s/certman-scheduler-cronjob.yaml`
+
+### 2. 纯参数 one-shot（适合 AI/自动化）
+
+无需配置文件，直接参数化调用：
+
+```bash
+uv run certman --data-dir data oneshot-issue -d example.com -d *.example.com -sp aliyun --email ops@example.com --ak <ak> --sk <sk> -o /tmp/example
+uv run certman --data-dir data oneshot-renew -d example.com -d *.example.com -sp aliyun --email ops@example.com --ak <ak> --sk <sk> -o /tmp/example
+```
+
+### 3. 控制面只读配置能力
+
+`certmanctl` / `certman-mcp` 已支持只读配置查询和校验：
+
+```bash
+uv run certmanctl --endpoint http://127.0.0.1:8000 config list
+uv run certmanctl --endpoint http://127.0.0.1:8000 config show --entry-name site-a
+uv run certmanctl --endpoint http://127.0.0.1:8000 config validate --entry-name site-a
+```
 
 ---
 

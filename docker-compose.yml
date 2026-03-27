@@ -4,11 +4,13 @@
 #   - certman: Pure local mode (standalone, no networking)
 #   - certman-server: Central API server (agents connect here)
 #   - certman-worker: Job worker (pairs with server, executes queued jobs)
+#   - certman-scheduler: Scheduler (independently enqueues renew jobs)
 #   - certman-agent: Agent mode (enabled via --profile agent, polls server for jobs)
 #
 # Quick Start:
 #   1. Local mode only: docker-compose up certman
 #   2. Server + worker: docker-compose up certman-server certman-worker
+#   2.1 Server + worker + scheduler: docker-compose up certman-server certman-worker certman-scheduler
 #   3. Full cluster: docker-compose --profile agent up
 #
 # Agent Registration (first-time only):
@@ -23,6 +25,18 @@ services:
     volumes:
       - ./data:/data
     profiles: ["local"]
+
+  # Local mode (Windows-friendly renew): keep /data/run in a Docker volume
+  # so certbot lineage symlinks work correctly during renew.
+  certman-linuxfs:
+    build: .
+    entrypoint: ["uv", "run", "certman", "--data-dir", "/data"]
+    volumes:
+      - ./data/conf:/data/conf
+      - ./data/output:/data/output
+      - ./data/log:/data/log
+      - certman-run-linuxfs:/data/run
+    profiles: ["local-linuxfs"]
 
   # Server: Central API that agents register with and poll from
   certman-server:
@@ -40,6 +54,13 @@ services:
     volumes:
       - ./data:/data
 
+  # Scheduler: Periodically scans certificates due for renewal and enqueues renew jobs
+  certman-scheduler:
+    build: .
+    entrypoint: ["uv", "run", "certman-scheduler", "--data-dir", "/data", "--config-file", "config.compose-server.toml", "--loop"]
+    volumes:
+      - ./data:/data
+
   # Agent: Registers with server and polls for certificate jobs
   # Enable via: docker-compose --profile agent up
   # Requires: CERTMAN_NODE_REGISTRATION_TOKEN for first-time registration
@@ -53,3 +74,6 @@ services:
       # One-time registration token (from server admin)
       # After successful first registration, this is no longer needed
       CERTMAN_NODE_REGISTRATION_TOKEN: ${CERTMAN_NODE_REGISTRATION_TOKEN:-replace-me}
+
+volumes:
+  certman-run-linuxfs:

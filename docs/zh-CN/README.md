@@ -58,6 +58,10 @@
 - [双 CLI 模式说明 (dual-cli-modes.md)](dual-cli-modes.md)
 - [双 CLI 实施总方案 (../notes/plans/2026-03-26-dual-cli-program.md)](../notes/plans/2026-03-26-dual-cli-program.md)
 - [cert-manager 协作扩展规划 (../plans/2026-03-27-cert-manager-addon-plugin-plan.md)](../plans/2026-03-27-cert-manager-addon-plugin-plan.md)
+- [cert-manager 协作模式图解（流程图/时序图 + FAQ） (../certman-cert-manager-collaboration-modes.md)](../certman-cert-manager-collaboration-modes.md)
+- [cert-manager 本地实施手册 (../plans/2026-03-27-cert-manager-local-implementation.md)](../plans/2026-03-27-cert-manager-local-implementation.md)
+- [独立调度架构（Scheduler 与 API/Worker 解耦） (../k8s-service-design.md)](../k8s-service-design.md)
+- [本地配置管理命令与三环境运行方式（见实施手册 §10） (../plans/2026-03-27-cert-manager-local-implementation.md)](../plans/2026-03-27-cert-manager-local-implementation.md)
 
 ---
 

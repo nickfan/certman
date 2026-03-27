@@ -27,6 +27,12 @@ data:
     listen_host = "0.0.0.0"
     listen_port = 8000
     signing_key_path = "data/run/keys/server_ed25519.pem"
+
+    [scheduler]
+    enabled = true
+    mode = "loop"
+    scan_interval_seconds = 30
+    renew_before_days = 30
     
     [[entries]]
     name = "site-a"
@@ -168,6 +174,42 @@ spec:
         image: certman:local
         imagePullPolicy: Never
         command: ["uv", "run", "certman-worker", "--data-dir", "/data", "--config-file", "config.toml", "--loop", "--interval-seconds", "10"]
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: config
+          mountPath: /data/conf
+        env:
+        - name: PYTHONUNBUFFERED
+          value: "1"
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: certman-data
+      - name: config
+        configMap:
+          name: certman-config
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: certman-scheduler
+  namespace: certman-lab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: certman-scheduler
+  template:
+    metadata:
+      labels:
+        app: certman-scheduler
+    spec:
+      containers:
+      - name: scheduler
+        image: certman:local
+        imagePullPolicy: Never
+        command: ["uv", "run", "certman-scheduler", "--data-dir", "/data", "--config-file", "config.toml", "--loop"]
         volumeMounts:
         - name: data
           mountPath: /data

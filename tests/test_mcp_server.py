@@ -66,3 +66,36 @@ def test_call_api_invalid_json(monkeypatch: pytest.MonkeyPatch) -> None:
 
     with pytest.raises(RuntimeError, match="API_ERROR:INVALID_JSON"):
         _call_api(method="GET", path="/health", config=config)
+
+
+def test_call_api_posts_config_validate_payload(monkeypatch: pytest.MonkeyPatch) -> None:
+    observed: dict[str, object] = {}
+
+    class _FakeResponse(SimpleNamespace):
+        def json(self) -> dict[str, object]:
+            return {"success": True, "data": {"ok": True}}
+
+    def _mock_request(**kwargs: object) -> _FakeResponse:
+        observed.update(kwargs)
+        return _FakeResponse(status_code=200)
+
+    monkeypatch.setattr(httpx, "request", _mock_request)
+    config = McpServerConfig(
+        endpoint="http://127.0.0.1:8000",
+        timeout=1.0,
+        token="tok",
+        poll_interval=1.0,
+        max_wait=1.0,
+    )
+
+    result = _call_api(
+        method="POST",
+        path="/api/v1/config/validate",
+        payload={"entry_names": ["site-a"], "validate_all": False},
+        config=config,
+    )
+
+    assert result == {"ok": True}
+    assert observed["method"] == "POST"
+    assert observed["url"] == "http://127.0.0.1:8000/api/v1/config/validate"
+    assert observed["json"] == {"entry_names": ["site-a"], "validate_all": False}

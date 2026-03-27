@@ -108,8 +108,50 @@ Exit codes:
 3. `20`: force-renew threshold reached
 4. `30`: missing certificate or entry failure
 
+## 7. Pure-Parameter One-Shot Mode (No Config)
+
+For AI/automation integration, you can run one-shot issue/renew in blocking mode without `config.toml` or `item_*.toml`.
+
+```bash
+# one-shot issue
+uv run certman --data-dir data oneshot-issue \
+  -d mydemo1.com -d *.mydemo1.com \
+  -sp route53 \
+  --email alice@mydemo1.com \
+  --ak <aws-ak> --sk <aws-sk> \
+  --aws-region us-east-1 \
+  -o /tmp/mydemo1
+
+# one-shot renew
+uv run certman --data-dir data oneshot-renew \
+  -d mydemo1.com -d *.mydemo1.com \
+  -sp route53 \
+  --email alice@mydemo1.com \
+  --ak <aws-ak> --sk <aws-sk> \
+  --aws-region us-east-1 \
+  -o /tmp/mydemo1
+```
+
+## 8. Independent Scheduler (Loop / Once / CronJob)
+
+Scheduler is a standalone process and does not run inside API server process.
+
+```bash
+# long-running scheduler
+docker compose up certman-server certman-worker certman-scheduler
+
+# one-shot scheduler trigger (for external cron)
+docker compose run --rm certman-scheduler once --force-enable
+```
+
+Kubernetes CronJob alternative manifest:
+
+1. `k8s/certman-scheduler-cronjob.yaml`
+2. apply with `kubectl apply -f k8s/certman-scheduler-cronjob.yaml`
+
 ## Links
 
 1. [Production Cookbook](cookbook-compose.md)
 2. [DNS Provider Setup](dns-providers.md)
 3. [API & AI Access](api-access.md)
+4. [cert-manager Local Implementation Handbook](../plans/2026-03-27-cert-manager-local-implementation.md)

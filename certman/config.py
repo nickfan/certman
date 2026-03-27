@@ -40,6 +40,15 @@ class ServerConfig(BaseModel):
     token_auth_enabled: bool = False
 
 
+class SchedulerConfig(BaseModel):
+    enabled: bool = False
+    mode: Literal["loop", "cron"] = "loop"
+    scan_interval_seconds: int = 300
+    cron_expr: str = "0 * * * *"
+    cron_poll_seconds: int = 15
+    renew_before_days: int = 30
+
+
 class NodeIdentityConfig(BaseModel):
     node_id: str
     private_key_path: str
@@ -87,6 +96,7 @@ class AppConfig(BaseModel):
     node_identity: NodeIdentityConfig | None = None
     hooks: list[HookConfig] = Field(default_factory=list)
     server: ServerConfig | None = None
+    scheduler: SchedulerConfig = Field(default_factory=SchedulerConfig)
 
     @model_validator(mode="after")
     def _validate_run_mode(self):
@@ -141,6 +151,67 @@ class GlobalOnlyConfig(BaseModel):
     node_identity: NodeIdentityConfig | None = None
     hooks: list[HookConfig] = Field(default_factory=list)
     server: ServerConfig | None = None
+    scheduler: SchedulerConfig = Field(default_factory=SchedulerConfig)
+
+
+def _parse_bool_env(value: str) -> bool:
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(f"invalid boolean env value: {value}")
+
+
+def _scheduler_env_fallback(
+    config: AppConfig,
+    env: dict[str, str],
+    *,
+    explicit_scheduler_fields: set[str] | None = None,
+) -> None:
+    defaults = SchedulerConfig()
+    scheduler = config.scheduler
+    if explicit_scheduler_fields is None:
+        explicit_fields = set(getattr(scheduler, "model_fields_set", set()))
+    else:
+        explicit_fields = set(explicit_scheduler_fields)
+
+    def _can_fallback(field_name: str, current_value, default_value) -> bool:
+        return field_name not in explicit_fields and current_value == default_value
+
+    raw_enabled = env.get("CERTMAN_SCHEDULER_ENABLED")
+    if raw_enabled is not None and _can_fallback("enabled", scheduler.enabled, defaults.enabled):
+        scheduler.enabled = _parse_bool_env(raw_enabled)
+
+    raw_mode = env.get("CERTMAN_SCHEDULER_MODE")
+    if raw_mode and _can_fallback("mode", scheduler.mode, defaults.mode):
+        mode = raw_mode.strip().lower()
+        if mode in {"loop", "cron"}:
+            scheduler.mode = mode
+        else:
+            raise ValueError("CERTMAN_SCHEDULER_MODE must be loop or cron")
+
+    raw_scan_interval = env.get("CERTMAN_SCHEDULER_SCAN_INTERVAL_SECONDS")
+    if raw_scan_interval is not None and _can_fallback(
+        "scan_interval_seconds", scheduler.scan_interval_seconds, defaults.scan_interval_seconds
+    ):
+        scheduler.scan_interval_seconds = int(raw_scan_interval)
+
+    raw_cron_expr = env.get("CERTMAN_SCHEDULER_CRON_EXPR")
+    if raw_cron_expr and _can_fallback("cron_expr", scheduler.cron_expr, defaults.cron_expr):
+        scheduler.cron_expr = raw_cron_expr
+
+    raw_cron_poll = env.get("CERTMAN_SCHEDULER_CRON_POLL_SECONDS")
+    if raw_cron_poll is not None and _can_fallback(
+        "cron_poll_seconds", scheduler.cron_poll_seconds, defaults.cron_poll_seconds
+    ):
+        scheduler.cron_poll_seconds = int(raw_cron_poll)
+
+    raw_renew_before = env.get("CERTMAN_SCHEDULER_RENEW_BEFORE_DAYS")
+    if raw_renew_before is not None and _can_fallback(
+        "renew_before_days", scheduler.renew_before_days, defaults.renew_before_days
+    ):
+        scheduler.renew_before_days = int(raw_renew_before)
 
 
 def _is_env_ref(value: str) -> bool:
@@ -273,9 +344,14 @@ def create_runtime(data_dir: str, config_file: str | None) -> Runtime:
     cfg_path = conf_dir / config_filename
 
     # Lazy import to avoid circular imports
-    from certman.config_merge import load_merged_config
+    from certman.config_merge import load_config_dict, load_merged_config
 
     config = load_merged_config(cfg_path)
+    env = dict(os.environ)
+    raw_cfg = load_config_dict(cfg_path)
+    raw_scheduler = raw_cfg.get("scheduler", {}) if isinstance(raw_cfg, dict) else {}
+    explicit_scheduler_fields = set(raw_scheduler.keys()) if isinstance(raw_scheduler, dict) else set()
+    _scheduler_env_fallback(config, env, explicit_scheduler_fields=explicit_scheduler_fields)
 
     # allow overriding data_dir in config (mostly for docker /data)
     if config.global_.data_dir:
@@ -300,8 +376,6 @@ def create_runtime(data_dir: str, config_file: str | None) -> Runtime:
         log_dir=log_dir,
         output_dir=output_dir,
     )
-
-    env = dict(os.environ)
 
     return Runtime(paths=paths, config=config, env=env)
 

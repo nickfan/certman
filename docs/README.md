@@ -42,6 +42,10 @@ These documents are used by all language versions:
 - **Kubernetes Deployment**: [k8s-service-design.md](k8s-service-design.md) - K8s integration guide
 - **Dual CLI Program**: [notes/plans/2026-03-26-dual-cli-program.md](notes/plans/2026-03-26-dual-cli-program.md) - Requirement, architecture, and implementation plan
 - **cert-manager 协作扩展规划**: [plans/2026-03-27-cert-manager-addon-plugin-plan.md](plans/2026-03-27-cert-manager-addon-plugin-plan.md) - Addon/Plugin/Extension planning registry (this phase is design-only)
+- **cert-manager 协作模式图解**: [certman-cert-manager-collaboration-modes.md](certman-cert-manager-collaboration-modes.md) - 业务流程图与时序图（模式A/B/C/D）
+- **本地实施与验证手册**: [plans/2026-03-27-cert-manager-local-implementation.md](plans/2026-03-27-cert-manager-local-implementation.md) - kind + cert-manager + CertMan 实施步骤
+- **独立调度架构**: [k8s-service-design.md](k8s-service-design.md) - §16 说明 scheduler 与 API/worker 解耦策略
+- **本地配置管理命令**: [plans/2026-03-27-cert-manager-local-implementation.md](plans/2026-03-27-cert-manager-local-implementation.md) - §10 包含 config/env 命令与三环境运行方式
 
 ---
 

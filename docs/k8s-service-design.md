@@ -2,7 +2,6 @@
 
 > 评估日期: 2026-03-24
 > 状态: 设计草案（已按最新定位修订）
-
 > 补充（2026-03-27）: cert-manager 协作以 addon/plugin/extension 形式登记为后续扩展，详见
 > `docs/plans/2026-03-27-cert-manager-addon-plugin-plan.md`。
 > 本期仅完成规划，不进入实现。
@@ -612,6 +611,7 @@ CertMan 应该被定义为：
 ### 14.1 已实装功能
 
 #### CLI / 本地自治模式
+
 - ✅ `certman` 命令及配置系统（TOML/YAML，支持 entry、hook、provider）
 - ✅ 本地证书生命周期（issue/renew/check/export）
 - ✅ 多 provider 支持（cloudflare、route53、aliyun）
@@ -619,6 +619,7 @@ CertMan 应该被定义为：
 - ✅ 本地自治模式配置验证
 
 #### 控制平面服务器
+
 - ✅ FastAPI HTTP Server (`certman-server`)
 - ✅ 配置系统升级为 server mode（`run_mode="server"`）
 - ✅ SQLAlchemy 数据库层（Alembic migration）
@@ -626,30 +627,35 @@ CertMan 应该被定义为：
 - ✅ Health endpoint (`GET /health`)
 
 #### 核心 API 端点（Phase 4）
+
 | 端点 | 实装状态 | 备注 |
-|------|--------|------|
+| --- | --- | --- |
 | `POST /api/v1/certificates` | ✅ 完成 | 创建 issue job，返回 job_id，202 Accepted |
 | `GET /api/v1/jobs/{job_id}` | ✅ 完成 | 查询 job 状态（queued/claimed/completed/failed） |
 | `POST /api/v1/webhooks` | ✅ 完成 | 创建 webhook 订阅，支持签名验证 |
 | `POST /api/v1/nodes/register` | ⏳ 实装中 | 节点使用一次性 token 注册 |
 
 #### 安全与身份认证
+
 - ✅ Ed25519 签名密钥对支持（在 server config 中）
 - ✅ 消息签名与验证框架（Node-Agent 通信）
 - ✅ Nonce 与 sequence 重放防护（已实装在 agent 模型）
 
 #### 后台工作进程
+
 - ✅ `certman-worker` 进程（--loop 模式）
 - ✅ Job 声明与处理（claim_next_job）
 - ✅ 异步任务驱动（30s 轮询间隔可配）
 - ✅ Event 发布/订阅基础框架
 
 #### 事件驱动能力
+
 - ✅ EventBus 框架（内存实装）
 - ✅ Webhook 订阅表与投递框架
 - ✅ Job 事件发布（job.queued/completed/failed）
 
 #### Docker & Kubernetes 部署
+
 - ✅ Docker 镜像构建（Dockerfile 完整）
 - ✅ Docker Compose 支持（3 个服务 + volume + network）
 - ✅ Kubernetes 部署清单（配置、PVC、Deployment、Service）
@@ -658,7 +664,7 @@ CertMan 应该被定义为：
 ### 14.2 进行中/部分实装
 
 | 功能 | 状态 | 说明 |
-|------|------|------|
+| --- | --- | --- |
 | Node Registry Service | ⏳ 框架就位 | 数据库表已定义，API 端点待完成 |
 | Credential Vault | ⏳ 基础实装 | 支持嵌入式 + 环境变量，长期 vault 服务待规划 |
 | Distribution Orchestrator | ⏳ 骨架设计 | Job 类型框架就位（distribute），具体算法待完成 |
@@ -668,7 +674,7 @@ CertMan 应该被定义为：
 ### 14.3 待规划/设计中
 
 | 功能 | 优先级 | 说明 |
-|------|--------|------|
+| --- | --- | --- |
 | Agent 节点模式 | 高 | 节点侧执行引擎、任务拉取、本地写入 |
 | 证书分发到 K8s Secret | 高 | 与通过 kubeconfig 的远端集群交互 |
 | 证书分发到对象存储 | 中 | S3/OSS 分发适配器 |
@@ -680,7 +686,8 @@ CertMan 应该被定义为：
 ### 14.4 验证矩阵
 
 #### 本地运行验证（✅ PASS）
-```
+
+```text
 pytest -q --tb=short        → 78/78 PASSED
 docker build -t certman:local . → SUCCESS
 docker compose up -d        → 3 services running
@@ -688,7 +695,8 @@ docker compose API smoke    → /health 200, /api/v1/certificates 404 (entry not
 ```
 
 #### Kubernetes 验证（✅ PASS on Kind 1.34）
-```
+
+```text
 kind create cluster --image kindest/node:v1.34.0  → Created
 kind load docker-image certman:local               → Loaded
 kubectl apply -f k8s-rehearsal.yaml                → All objects created
@@ -701,18 +709,204 @@ HTTP: kubectl port-forward svc/certman-server 8001:8000
 ### 14.5 下一步行动项
 
 **短期（本周）：**
+
 1. 补充 k8s 部署中的 worker 容器与端到端 job 流验证
 2. 添加完整配置示例（item_site-a.toml）到 ConfigMap
 3. 在 kind 环境中验证 job 从提交 → worker 处理 → 完成的完整链路
 4. 验证 webhook 事件投递（job.queued/completed）
 
 **中期（2 周内）：**
+
 1. 实装 POST /api/v1/nodes/register 与节点注册表
 2. 实装 agent 节点侧的任务拉取与本地执行框架
 3. 测试受控节点模式下的简单分发
 
 **长期（规划中）：**
+
 1. Credential Vault 服务化
 2. K8s Secret 分发适配器
 3. 用户认证与 RBAC
 4. 信封加密与 mTLS
+
+---
+
+## 15. 跨环境配置兼容层（三环境统一模型）
+
+> 更新: 2026-03-27
+
+### 15.1 设计目标
+
+CertMan 需要在三种典型环境下做到 **零代码改动** 的配置切换：
+
+| 环境 | 典型场景 | 配置来源 |
+| --- | --- | --- |
+| 本地开发（宿主机直接运行） | 开发调试、CLI 一次性签发 | 文件系统 `data/conf/` |
+| Docker Compose | 团队本地联调、CI 环境 | bind mount + `env_file:` |
+| Kubernetes 生产 | 正式交付、自动续签 | ConfigMap + Secret |
+
+三种环境对 CertMan 代码路径完全透明——读配置与读凭据的代码逻辑一字不改。
+
+### 15.2 实现机制
+
+兼容性由以下两个代码点天然保证：
+
+**① `certman/config.py` — `load_dotenv(override=False)`**
+
+```python
+# config.py  (简化)
+conf_dir = base / "conf"           # 默认 data/conf/
+dotenv_path = conf_dir / ".env"
+load_dotenv(dotenv_path=dotenv_path, override=False)   # 已存在的 env 不被覆盖
+```
+
+- 本地：从 `data/conf/.env` 加载
+- Docker Compose：`env_file:` 或 `environment:` 预先注入
+- **K8s**：Secret `envFrom` 先于 `load_dotenv` 执行，`override=False` 保证 Secret 注入的环境变量优先——`.env` 文件即使存在也不会覆盖 Secret
+
+**② `certman/providers.py` — `os.getenv("CERTMAN_<PROVIDER>_<ACCOUNT>_<KEY>")`**
+
+```python
+# providers.py  (简化)
+account = normalize_account_id(entry.account_id)   # strip().replace("-","_").upper()
+ak = os.getenv(f"CERTMAN_ALIYUN_{account}_ACCESS_KEY_ID")
+```
+
+`os.getenv()` 不关心值从哪里来，文件、Compose、K8s Secret 均走同一路径。
+
+### 15.3 三环境配置对照表
+
+| 项目 | 本地开发 | Docker Compose | Kubernetes 生产 |
+| --- | --- | --- | --- |
+| 非敏感配置（`*.toml`） | `data/conf/*.toml`（文件） | bind mount `./data/conf` | ConfigMap → 挂载 `/data/conf/` |
+| 敏感凭据（AK/SK、Token） | `data/conf/.env`（文件） | `env_file: data/conf/.env` 或 `environment:` | Secret → **`envFrom.secretRef`** → 容器环境变量 |
+| 注册令牌（单键） | `data/conf/.env` 或 CLI 参数 | `environment: CERTMAN_NODE_REGISTRATION_TOKEN=...` | Secret → **`secretKeyRef`** 单键注入 |
+| CertMan 读取调用点 | `load_dotenv` + `os.getenv()` | 同左 | 同左（代码 0 改动） |
+
+### 15.4 环境变量命名约定
+
+`providers.py` 的 `normalize_account_id()` 规则：`strip().replace("-","_").upper()`
+
+| `item_*.toml` 中的 `account_id` | 对应环境变量名 |
+| --- | --- |
+| `my_aliyun` | `CERTMAN_ALIYUN_MY_ALIYUN_ACCESS_KEY_ID` / `_ACCESS_KEY_SECRET` |
+| `my-cloudflare` | `CERTMAN_CLOUDFLARE_MY_CLOUDFLARE_API_TOKEN` |
+| `prod_aws` | `CERTMAN_AWS_PROD_AWS_ACCESS_KEY_ID` / `_SECRET_ACCESS_KEY` / `_REGION` |
+
+凭据也可在 TOML 中直接使用 `${ENV_VAR}` 引用语法，`_resolve_value()` 负责解引用：
+
+```toml
+# item_example.toml
+[[entries]]
+name = "example"
+dns_provider = "aliyun"
+[entries.credentials]
+access_key_id     = "${MY_CUSTOM_AK}"       # 直接引用任意环境变量
+access_key_secret = "${MY_CUSTOM_SK}"
+```
+
+### 15.5 K8s 推荐配置层次
+
+```text
+┌─────────────────────────────────────────────────────┐
+│  ConfigMap: certman-config                          │
+│  └─ config.toml, item_*.toml（非敏感）              │
+│     ↓ 挂载到 /data/conf/（ReadOnly）                │
+├─────────────────────────────────────────────────────┤
+│  Secret: certman-dns-credentials                    │
+│  └─ CERTMAN_ALIYUN_*/CLOUDFLARE_*/AWS_*             │
+│     ↓ envFrom.secretRef → 容器环境变量              │
+├─────────────────────────────────────────────────────┤
+│  Secret: certman-agent-registration                 │
+│  └─ registration-token                              │
+│     ↓ secretKeyRef → CERTMAN_NODE_REGISTRATION_TOKEN│
+└─────────────────────────────────────────────────────┘
+               ↓ 以上对 CertMan 代码完全透明
+       config.py + providers.py 同一读取路径
+```
+
+### 15.6 不推荐做法
+
+| 做法 | 原因 |
+| --- | --- |
+| 把 AK/SK 写入 ConfigMap | ConfigMap 可被普通 RBAC 角色读取，不符合最小权限 |
+| 把凭据硬编码进 `item_*.toml` 后提交 Git | 凭据泄漏风险 |
+| 对 K8s 环境使用 `override=True` 的 `.env` 文件 | 会覆盖 Secret 注入值，导致环境变量优先级反转 |
+
+### 15.7 参考文件
+
+- 实验清单: [`k8s-e2e-test.yaml`](../k8s-e2e-test.yaml)（ConfigMap + PVC，功能连通性验证用）
+- **生产级示例清单**: [`k8s/certman-prod-credentials-example.yaml`](../k8s/certman-prod-credentials-example.yaml)（ConfigMap + Secret + envFrom 完整模板）
+- 协作模式文档: [`docs/certman-cert-manager-collaboration-modes.md`](certman-cert-manager-collaboration-modes.md) §9
+
+---
+
+## 16. 独立 Scheduler 架构（已实装）
+
+> 更新: 2026-03-27
+
+### 16.1 目标与边界
+
+1. 调度逻辑不内嵌在 `certman-server`（REST API 服务）进程。
+2. 使用独立 `certman-scheduler` 进程周期调用 `schedule_due_renewals()`。
+3. `certman-worker` 独立消费 job 队列并执行续签。
+
+### 16.2 运行时职责划分
+
+```mermaid
+flowchart LR
+   S[certman-scheduler] -->|enqueue renew job| DB[(job table)]
+   W[certman-worker] -->|claim+execute| DB
+   A[certman-server] -->|API submit/query| DB
+
+   S -. no embedded scheduler .-> A
+```
+
+关键点：
+
+1. scheduler 与 server 通过数据库协作，不共享进程生命周期。
+2. scheduler 仅负责“发现到期 -> 入队 renew”，不执行 certbot。
+3. worker 仅负责“取队列 -> 执行 -> 回写状态”。
+
+### 16.3 调度策略
+
+支持两种模式：
+
+1. `mode = "loop"`：常驻循环（主推荐）
+2. `mode = "cron"`：按 cron 表达式触发（5段式）
+
+并支持外部定时系统调用一次性命令：
+
+```powershell
+uv run certman-scheduler --once --force-enable
+```
+
+### 16.4 配置模型
+
+`[scheduler]` 全局配置字段：
+
+1. `enabled`
+2. `mode`
+3. `scan_interval_seconds`
+4. `cron_expr`
+5. `cron_poll_seconds`
+6. `renew_before_days`
+
+优先级：
+
+1. `config.toml` 显式配置
+2. `CERTMAN_SCHEDULER_*` 环境变量兜底
+
+### 16.5 部署接入
+
+1. Docker Compose 已提供 `certman-scheduler` 服务。
+2. K8s 清单已提供独立 `certman-scheduler` Deployment。
+3. K8s 也支持 CronJob 一次性调度替代常驻进程：`k8s/certman-scheduler-cronjob.yaml`。
+4. CronJob 推荐命令：`certman-scheduler once --force-enable`。
+5. 推荐副本策略：`replicas=1`；若要多副本需引入分布式锁（后续议题）。
+
+### 16.6 验证口径
+
+1. scheduler 启动后周期输出 `scheduled=<n>`。
+2. 数据库出现 `renew` 类型 queued job。
+3. worker 将 queued job 推进到 completed/failed。
+4. API 服务在不重启 scheduler 的情况下仍可独立提供接口。

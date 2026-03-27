@@ -12,6 +12,7 @@ CertMan 现在基于同一套配置和 service 层提供四个运行入口：
 - `certman-server`：控制面 FastAPI 服务，提供健康检查、任务提交、任务查询、webhook 订阅
 - `certman-worker`：后台任务执行器，消费 `issue` / `renew` 队列任务
 - `certman-agent`：受控节点 agent 入口，当前提供最小 polling 骨架
+- `certman-scheduler`：独立续签调度器（loop/cron/once）
 
 常用本地命令：
 
@@ -20,12 +21,15 @@ uv run certman --help
 uv run certman-server --data-dir data --config-file config.toml
 uv run certman-worker --data-dir data --config-file config.toml --once
 uv run certman-agent --data-dir data --config-file config.toml --once
+uv run certman-scheduler run --data-dir data --config-file config.toml --loop
+uv run certman-scheduler once --data-dir data --config-file config.toml --force-enable
 ```
 
 ## 运行依赖矩阵
 
 - `certman`（CLI 本地模式）：不依赖 Kubernetes 或 Docker，可直接通过 Python/uv 运行。
 - `certman-server` + `certman-worker`：不依赖 Kubernetes 或 Docker；Docker 仅用于打包/部署。
+- `certman-scheduler`：不依赖 Kubernetes 或 Docker，可独立常驻或一次性运行。
 - `certman-agent`：不强依赖 Kubernetes 或 Docker，但需要可访问的控制面 endpoint。
 - `scripts/certman-docker.ps1` / `scripts/certman-docker.sh`：本质是 docker 包装脚本，必须依赖 Docker 引擎。
 
@@ -34,6 +38,7 @@ uv run certman-agent --data-dir data --config-file config.toml --once
 ```bash
 uv run certman --data-dir data entries
 uv run certman --data-dir data check --warn-days 30 --force-renew-days 7
+uv run certman --data-dir data oneshot-issue -d example.com -d *.example.com -sp aliyun --email ops@example.com --ak <ak> --sk <sk> -o /tmp/example.com
 ```
 
 ```powershell
@@ -100,6 +105,9 @@ docker compose run --rm certman export --all
 
 # 6) 启动控制面与 worker
 docker compose up certman-server certman-worker
+
+# 7) 启动独立 scheduler
+docker compose up certman-server certman-worker certman-scheduler
 ```
 
 控制面接口快速验证：

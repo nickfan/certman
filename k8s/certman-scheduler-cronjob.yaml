@@ -1,0 +1,46 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: certman-scheduler-once
+  namespace: certman-lab
+spec:
+  # Every 15 minutes; adjust by your renewal policy.
+  schedule: "*/15 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+          - name: scheduler
+            image: certman:local
+            imagePullPolicy: IfNotPresent
+            command:
+            - uv
+            - run
+            - certman-scheduler
+            - once
+            - --data-dir
+            - /data
+            - --config-file
+            - config.toml
+            - --force-enable
+            volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: config
+              mountPath: /data/conf
+            env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+          volumes:
+          - name: data
+            persistentVolumeClaim:
+              claimName: certman-data
+          - name: config
+            configMap:
+              name: certman-config

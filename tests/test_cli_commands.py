@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -350,6 +351,112 @@ entries:
     assert result.exit_code == 30
     assert "lineage-unresolved" in result.stdout
     assert "multiple certificate lineages match example.com" in result.stdout
+
+
+def test_config_add_list_show_remove_item_storage(tmp_path: Path) -> None:
+    runner = CliRunner()
+    data_dir = tmp_path / "data"
+    conf_dir = data_dir / "conf"
+    conf_dir.mkdir(parents=True)
+    (conf_dir / "config.toml").write_text(
+        """
+run_mode = "local"
+
+[global]
+data_dir = "data"
+email = "ops@example.com"
+scan_items_glob = "item_*.toml"
+""".strip(),
+        encoding="utf-8",
+    )
+
+    add_result = runner.invoke(
+        app,
+        [
+            "--data-dir",
+            str(data_dir),
+            "config",
+            "add",
+            "--name",
+            "site-a",
+            "--primary-domain",
+            "example.com",
+            "--dns-provider",
+            "aliyun",
+            "--account-id",
+            "test_account",
+            "--storage",
+            "item",
+        ],
+    )
+    assert add_result.exit_code == 0
+
+    list_result = runner.invoke(app, ["--data-dir", str(data_dir), "config", "list"])
+    assert list_result.exit_code == 0
+    assert "site-a" in list_result.stdout
+
+    show_result = runner.invoke(
+        app,
+        ["--data-dir", str(data_dir), "config", "show", "--name", "site-a", "--json"],
+    )
+    assert show_result.exit_code == 0
+    payload = json.loads(show_result.stdout)
+    assert payload["primary_domain"] == "example.com"
+
+    remove_result = runner.invoke(
+        app,
+        ["--data-dir", str(data_dir), "config", "remove", "--name", "site-a", "--storage", "item", "--yes"],
+    )
+    assert remove_result.exit_code == 0
+
+
+def test_env_set_list_unset(tmp_path: Path) -> None:
+    runner = CliRunner()
+    data_dir = tmp_path / "data"
+    conf_dir = data_dir / "conf"
+    conf_dir.mkdir(parents=True)
+    (conf_dir / "config.toml").write_text(
+        """
+run_mode = "local"
+
+[global]
+data_dir = "data"
+email = "ops@example.com"
+""".strip(),
+        encoding="utf-8",
+    )
+
+    set_result = runner.invoke(
+        app,
+        ["--data-dir", str(data_dir), "env", "set", "--key", "CERTMAN_TEST_KEY", "--value", "secret"],
+    )
+    assert set_result.exit_code == 0
+
+    list_result = runner.invoke(app, ["--data-dir", str(data_dir), "env", "list"])
+    assert list_result.exit_code == 0
+    assert "CERTMAN_TEST_KEY=***" in list_result.stdout
+
+    unset_result = runner.invoke(
+        app,
+        ["--data-dir", str(data_dir), "env", "unset", "--key", "CERTMAN_TEST_KEY"],
+    )
+    assert unset_result.exit_code == 0
+
+
+def test_config_init_non_interactive_creates_files(tmp_path: Path) -> None:
+    runner = CliRunner()
+    data_dir = tmp_path / "data"
+    conf_dir = data_dir / "conf"
+    conf_dir.mkdir(parents=True)
+
+    result = runner.invoke(
+        app,
+        ["--data-dir", str(data_dir), "config", "init", "--non-interactive", "--with-env"],
+    )
+
+    assert result.exit_code == 0
+    assert (conf_dir / "config.toml").exists()
+    assert (conf_dir / ".env").exists()
 
 
 def test_check_fix_skips_unresolved_lineage(monkeypatch, tmp_path: Path) -> None:
@@ -836,3 +943,83 @@ def test_export_no_overwrite_succeeds_when_output_already_exists(monkeypatch, tm
     )
 
     assert len(copied) == 4
+
+
+def test_oneshot_issue_runs_without_config_and_exports(monkeypatch, tmp_path: Path) -> None:
+    runner = CliRunner()
+    data_dir = tmp_path / "data"
+    output_dir = tmp_path / "out"
+
+    class FakeResult:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+        cmd = ["certbot", "certonly"]
+
+        @property
+        def ok(self):
+            return True
+
+        def is_admin_required_error(self):
+            return False
+
+    export_calls: dict[str, Path] = {}
+
+    def fake_export_from_live(*, letsencrypt_live_dir: Path, output_entry_dir: Path, overwrite: bool):
+        export_calls["live"] = letsencrypt_live_dir
+        export_calls["out"] = output_entry_dir
+        return ExportResult(success=True, copied_paths=[output_entry_dir / "fullchain.pem"])
+
+    monkeypatch.setattr("certman.cli.run_certbot", lambda *args, **kwargs: FakeResult())
+    monkeypatch.setattr("certman.cli._export_service.export_from_live", fake_export_from_live)
+
+    result = runner.invoke(
+        app,
+        [
+            "--data-dir",
+            str(data_dir),
+            "oneshot-issue",
+            "-d",
+            "example.com",
+            "-d",
+            "*.example.com",
+            "-sp",
+            "aliyun",
+            "--email",
+            "ops@example.com",
+            "--ak",
+            "ak",
+            "--sk",
+            "sk",
+            "-o",
+            str(output_dir),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "ok: issue completed" in result.stdout
+    assert export_calls["live"].as_posix().endswith("/data/run/letsencrypt/live/example.com")
+    assert export_calls["out"] == output_dir
+
+
+def test_oneshot_issue_validates_provider_credentials(tmp_path: Path) -> None:
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "--data-dir",
+            str(tmp_path / "data"),
+            "oneshot-issue",
+            "-d",
+            "example.com",
+            "-sp",
+            "aliyun",
+            "--email",
+            "ops@example.com",
+            "-o",
+            str(tmp_path / "out"),
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "aliyun requires --access-key-id/--access-key-secret" in result.output

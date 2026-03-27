@@ -15,12 +15,18 @@ This manual focuses on parameters, behavior contracts, state machine semantics, 
 | run_mode | local/agent/server mode | local | all |
 | global.data_dir | data root | data | all |
 | global.acme_server | staging/prod ACME env | staging | CLI/Service |
-| global.email | certbot registration email | admin@example.com | CLI/Service |
+| global.email | certbot registration email | `admin@example.com` | CLI/Service |
 | global.letsencrypt_dir | certbot state dir | letsencrypt | CLI/Service |
 | server.db_path | control plane DB path | data/run/certman.db | Service/Agent |
 | server.listen_host | API listen host | 0.0.0.0 | Service |
 | server.listen_port | API listen port | 8000 | Service |
 | server.signing_key_path | server Ed25519 private key | null | Service/Agent |
+| scheduler.enabled | scheduler global switch | false | Service/Scheduler |
+| scheduler.mode | scheduler mode loop/cron | loop | Scheduler |
+| scheduler.scan_interval_seconds | loop interval seconds | 300 | Scheduler |
+| scheduler.cron_expr | cron expression (5 fields) | `0 * * * *` | Scheduler |
+| scheduler.cron_poll_seconds | cron polling clock | 15 | Scheduler |
+| scheduler.renew_before_days | queue renew before N days | 30 | Scheduler |
 | control_plane.endpoint | control plane base URL | n/a | Agent |
 | control_plane.poll_interval_seconds | poll interval seconds | 30 | Agent |
 | node_identity.node_id | node unique id | n/a | Agent |
@@ -79,7 +85,27 @@ Threshold formulas:
 uv run certman -D data export --name site-a --overwrite
 ```
 
-Exports from certbot live path into data/output/<entry>/.
+Exports from certbot live path into `data/output/entry_name/`.
+
+### 3.6 oneshot-issue / oneshot-renew (pure parameter mode)
+
+For automation/AI skill calls without config files:
+
+```bash
+uv run certman -D data oneshot-issue -d example.com -d *.example.com -sp aliyun --email ops@example.com --ak <ak> --sk <sk> -o /tmp/example
+uv run certman -D data oneshot-renew -d example.com -d *.example.com -sp aliyun --email ops@example.com --ak <ak> --sk <sk> -o /tmp/example
+```
+
+Provider credential requirements:
+
+- aliyun/route53: `--ak` + `--sk`
+- cloudflare: `--api-token`
+
+### 3.7 Local config and env commands
+
+`certman config` supports merged entry management (`list/show/add/edit/remove/init`).
+
+`certman env` supports `.env` key management (`list/set/unset`).
 
 ## 4. Service API Manual
 
@@ -171,6 +197,12 @@ POST /api/v1/nodes/register
 - accepts a PEM-encoded Ed25519 public key.
 - returns `poll_endpoint` for subsequent agent polling.
 
+### 4.5 Read-only config APIs
+
+- `GET /api/v1/config/entries`
+- `GET /api/v1/config/entries/{entry_name}`
+- `POST /api/v1/config/validate`
+
 ## 5. Agent Protocol Manual
 
 ### 5.1 poll
@@ -211,6 +243,7 @@ Primary commands:
 - `certmanctl cert create|list|get|renew`
 - `certmanctl job get|list|wait`
 - `certmanctl webhook create|list|get|update|delete`
+- `certmanctl config list|show|validate`
 
 `certmanctl` is a user-facing wrapper over REST. It is the recommended interface for shell automation that prefers stable command names and exit codes.
 
@@ -218,6 +251,14 @@ Primary commands:
 
 - This repository provides a stdio MCP server via `certman-mcp`.
 - Start with `uv run certman-mcp --endpoint http://127.0.0.1:8000` and use it as a tool wrapper over control-plane REST APIs.
+
+Current MCP tools include: health, cert_*, job_*, webhook_*, config_list/config_get/config_validate.
+
+## 7.1 Scheduler operation patterns
+
+- Long-running: `uv run certman-scheduler run --data-dir data --config-file config.toml --loop`
+- One-shot: `uv run certman-scheduler once --data-dir data --config-file config.toml --force-enable`
+- K8s CronJob example: `k8s/certman-scheduler-cronjob.yaml`
 
 ## 8. State Machine and Concurrency
 
