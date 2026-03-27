@@ -8,12 +8,14 @@ from certman.services.job_service import JobService
 def test_job_service_creates_and_reads_job(tmp_path: Path) -> None:
     service = JobService(db_path=tmp_path / "certman.db")
 
-    job = service.create_job(job_type="issue", subject_id="site-a")
+    job = service.create_job(job_type="issue", subject_id="site-a", target_type="nginx", target_scope="office")
     fetched = service.get_job(job.job_id)
 
     assert fetched is not None
     assert fetched.job_id == job.job_id
     assert fetched.status == "queued"
+    assert fetched.target_type == "nginx"
+    assert fetched.target_scope == "office"
 
 
 def test_job_service_updates_job_status(tmp_path: Path) -> None:
@@ -46,3 +48,14 @@ def test_job_service_enqueue_unique_job_avoids_duplicates(tmp_path: Path) -> Non
     assert created_first is True
     assert created_second is False
     assert first.job_id == second.job_id
+
+
+def test_job_service_list_jobs_supports_target_scope(tmp_path: Path) -> None:
+    service = JobService(db_path=tmp_path / "certman.db")
+    service.create_job(job_type="issue", subject_id="site-a", target_scope="office")
+    service.create_job(job_type="issue", subject_id="site-b", target_scope="prod")
+
+    office_jobs = service.list_jobs(target_scope="office")
+
+    assert len(office_jobs) == 1
+    assert office_jobs[0].subject_id == "site-a"

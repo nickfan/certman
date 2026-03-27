@@ -43,6 +43,17 @@ if `[server].token_auth_enabled = false`, token is optional.
 if `[server].token_auth_enabled = true`, provide `--token` or `CERTMAN_SERVER_TOKEN`.
 if server returns `AUTH_TOKEN_CONFIG_ERROR`, report server-side token config issue (`entries[].token` > `global.token`).
 
+1. Scope filtering note:
+
+`certmanctl job list` currently has no `--target-scope`; use REST query (`/api/v1/jobs?target_scope=...`) or MCP `job_list(target_scope=...)`.
+
+## Agent channel (node-agent)
+
+1. If low-latency dispatch is required, set `control_plane.prefer_subscribe=true`.
+2. Validate `control_plane.subscribe_wait_seconds` is lower than upstream gateway timeout.
+3. Default bundle policy is `[server].bundle_token_required = true`; agent must carry assignment `bundle_token` when downloading bundle.
+4. If bundle token expires, retry poll/subscribe to refresh token before retrying bundle fetch.
+
 ## MCP (certman-mcp)
 
 1. Confirm server endpoint reachable first.

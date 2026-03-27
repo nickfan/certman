@@ -13,6 +13,7 @@ from certman.api.routes.node_agent import router as node_agent_router
 from certman.api.routes.webhooks import router as webhooks_router
 from certman.config import create_runtime, resolve_runtime_path
 from certman.events import EventBus
+from certman.node_agent.subscribe_bus import notify_assignment_candidates_updated
 from certman.services.webhook_service import WebhookService
 
 
@@ -54,6 +55,7 @@ def create_app(*, data_dir: str = "data", config_file: str | None = None) -> Fas
             topic,
             lambda event, service=webhook_service: service.publish_event(topic=event.topic, payload=event.payload),
         )
+    event_bus.subscribe("job.queued", lambda event: notify_assignment_candidates_updated())
 
     app = FastAPI(
         title="CertMan Control Plane",

@@ -21,6 +21,8 @@ This manual focuses on parameters, behavior contracts, state machine semantics, 
 | server.listen_host | API listen host | 0.0.0.0 | Service |
 | server.listen_port | API listen port | 8000 | Service |
 | server.signing_key_path | server Ed25519 private key | null | Service/Agent |
+| server.bundle_token_required | require short-lived bundle token | true | Service/Agent |
+| server.bundle_token_ttl_seconds | bundle token TTL (seconds) | 300 | Service/Agent |
 | scheduler.enabled | scheduler global switch | false | Service/Scheduler |
 | scheduler.mode | scheduler mode loop/cron | loop | Scheduler |
 | scheduler.scan_interval_seconds | loop interval seconds | 300 | Scheduler |
@@ -29,8 +31,12 @@ This manual focuses on parameters, behavior contracts, state machine semantics, 
 | scheduler.renew_before_days | queue renew before N days | 30 | Scheduler |
 | control_plane.endpoint | control plane base URL | n/a | Agent |
 | control_plane.poll_interval_seconds | poll interval seconds | 30 | Agent |
+| control_plane.prefer_subscribe | prefer subscribe long-poll first | false | Agent |
+| control_plane.subscribe_wait_seconds | subscribe wait timeout seconds | 25 | Agent |
 | node_identity.node_id | node unique id | n/a | Agent |
 | node_identity.private_key_path | node private key path | n/a | Agent |
+| entries[].target_type | delivery target type (generic/nginx/openresty/k8s-ingress) | generic | Service/Agent |
+| entries[].target_scope | delivery scope label (env/cluster) | null | Service/Agent |
 
 ## 3. CLI Command Manual
 
@@ -159,7 +165,7 @@ If a queued renew job already exists for the same entry, the existing job is reu
 
 GET /api/v1/jobs
 
-- supports `subject_id`, `status`, `limit` query filters.
+- supports `subject_id`, `status`, `target_scope`, `limit` query filters.
 
 GET /api/v1/jobs/{job_id}
 
@@ -220,8 +226,28 @@ Server behavior:
 - verifies signature
 - stores nonce and rejects replay with 409
 - claims next available job and returns signed bundle metadata
+- when short-lived token policy is enabled, also returns `bundle_token` and `bundle_token_expires_at`
 
-### 5.2 result
+### 5.2 subscribe
+
+POST /api/v1/node-agent/subscribe
+
+Server behavior:
+
+- uses the same signature and nonce rules as poll
+- holds a long-poll request until job events or timeout
+- returns assignments immediately when available; otherwise returns empty assignments for poll fallback
+
+### 5.3 heartbeat
+
+POST /api/v1/node-agent/heartbeat
+
+Server behavior:
+
+- lightweight liveness update for node health reporting
+- does not mutate job state on its own
+
+### 5.4 callback / result
 
 POST /api/v1/node-agent/result fields:
 
@@ -234,6 +260,10 @@ Constraints:
 - only running jobs can transition
 - node ownership must match
 - signature covers job_id/status/output/error payload
+
+POST /api/v1/node-agent/callback
+
+- semantic alias for result reporting with the same validation rules
 
 ## 6. Remote CLI Manual (`certmanctl`)
 
@@ -254,10 +284,13 @@ Primary commands:
 
 Current MCP tools include: health, cert_*, job_*, webhook_*, config_list/config_get/config_validate.
 
+`job_list` supports `target_scope` filtering for segmented operations.
+
 ## 7.1 Scheduler operation patterns
 
 - Long-running: `uv run certman-scheduler run --data-dir data --config-file config.toml --loop`
 - One-shot: `uv run certman-scheduler once --data-dir data --config-file config.toml --force-enable`
+- Scope-filtered run: append `--target-scope <scope>` to run/once modes
 - K8s CronJob example: `k8s/certman-scheduler-cronjob.yaml`
 
 ## 8. State Machine and Concurrency

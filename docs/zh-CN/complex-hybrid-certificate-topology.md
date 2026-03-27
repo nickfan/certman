@@ -432,6 +432,29 @@ generate_x25519_keypair(
 3. Agent 检测到响应中包含 `envelope` 字段时，自动用本地 X25519 私钥解密，还原明文 bundle。
 4. 如果服务端未开启加密或节点无加密公钥，bundle 退回明文模式，兼容旧版 agent。
 
+### 9.3 Bundle 短时 Token（默认开启）
+
+为降低凭据泄漏后的可利用窗口，bundle 下载现已默认要求短时 token：
+
+- poll 响应会下发 `bundle_token` 与 `bundle_token_expires_at`。
+- 下载 bundle 时，除了签名参数外，还必须携带 `bundle_token`。
+- token 绑定 `node_id + job_id + exp`，并使用服务端签名密钥做 HMAC-SHA256 签名。
+
+```toml
+[server]
+# 默认 true：强制下载 token
+bundle_token_required = true
+# token 有效期（秒）
+bundle_token_ttl_seconds = 300
+```
+
+兼容模式（仅迁移窗口建议使用）：
+
+```toml
+[server]
+bundle_token_required = false
+```
+
 ## 10. 典型落地映射表
 
 | 端点类型 | 推荐分发方式 | 生效动作 | 验证方式 |
@@ -451,16 +474,17 @@ generate_x25519_keypair(
 
 1. Agent `--loop` 模式已支持轮询执行。
 2. Agent 任务执行闭环已打通：poll -> bundle -> execute -> result。
-3. bundle 下载接口已落地，包含签名验证与 nonce 防重放。
-4. NodeExecutor 已支持本地文件落盘 + hook 执行。
+3. node-agent 已支持 `subscribe`、`heartbeat`、`callback` 三个接口，兼容 push+pull 混合模式。
+4. job 模型已支持 `target_type` 与 `target_scope` 字段。
+5. bundle 下载已支持短时 token（默认强制，可配置关闭）。
+6. scheduler 已支持 `--target-scope` 参数按网络分区扫描续签。
+7. NodeExecutor 已支持按 `target_type` 选择 nginx/openresty/k8s-ingress 适配器（MVP）。
 
-后续建议：
+后续建议（高优先级）：
 
-1. 新增 Agent 订阅接口：`subscribe`, `heartbeat`, `callback`，支撑 push+pull 双模式。
-2. 在 job 模型中补充分发目标类型与网络分区字段。
-3. 为 bundle 下载增加短时 token 与更细粒度权限控制。
-4. 在 scheduler 增加 `target-scope`，支持按网络分区扫描续签。
-5. 在 delivery 层增加更多本地端点适配器（nginx/openresty/k8s ingress）。
+1. 将 `subscribe` 升级为真正的服务端事件下发通道（当前为兼容入口，核心仍是 pull）。
+2. 将 k8s-ingress 适配器接入真实集群 apply/回滚流程（当前输出 Secret YAML）。
+3. 在 API 文档和运维手册中补充“token 默认开启”的升级迁移说明与排障手册。
 
 ## 12. 结论
 

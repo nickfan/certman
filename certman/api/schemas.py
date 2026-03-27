@@ -39,6 +39,8 @@ class JobResponse(BaseModel):
     job_id: str = Field(description="Unique job identifier", examples=["a1b2c3d4e5f6"])
     job_type: str = Field(description="Job type", examples=["issue"])
     subject_id: str = Field(description="Certificate entry name or other subject identifier", examples=["site-a"])
+    target_type: str = Field(default="generic", description="Delivery target type", examples=["k8s-ingress"])
+    target_scope: str | None = Field(default=None, description="Delivery/network scope", examples=["office-lan"])
     node_id: str | None = Field(default=None, description="Assigned node ID when claimed by agent", examples=["node-a"])
     status: Literal["queued", "running", "completed", "failed", "cancelled"] = Field(
         description="Current job state"
@@ -55,6 +57,8 @@ class JobResponse(BaseModel):
                 "job_id": "a1b2c3d4e5f6",
                 "job_type": "issue",
                 "subject_id": "site-a",
+                "target_type": "generic",
+                "target_scope": None,
                 "node_id": None,
                 "status": "queued",
                 "attempts": 0,
@@ -142,6 +146,8 @@ class PollAssignmentResponse(BaseModel):
     job_type: str = Field(description="Assigned job type", examples=["issue"])
     bundle_url: str = Field(description="Relative URL used by agent to fetch bundle metadata", examples=["/api/v1/node-agent/bundles/a1b2c3d4e5f6"])
     bundle_signature: str = Field(description="Server signature over the assignment payload", examples=["base64-signature"])
+    bundle_token: str | None = Field(default=None, description="Short-lived bundle access token")
+    bundle_token_expires_at: int | None = Field(default=None, description="Bundle token expiration unix timestamp")
 
 
 class PollResponse(BaseModel):

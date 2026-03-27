@@ -30,6 +30,8 @@ class GlobalConfig(BaseModel):
 class ControlPlaneConfig(BaseModel):
     endpoint: str
     poll_interval_seconds: int = 30
+    prefer_subscribe: bool = False
+    subscribe_wait_seconds: int = 25
 
 
 class ServerConfig(BaseModel):
@@ -42,6 +44,9 @@ class ServerConfig(BaseModel):
     # "encrypt" = X25519 ECIES envelope (AES-256-GCM) applied to bundle content.
     # Requires node to register with encryption_public_key.
     bundle_encryption: Literal["none", "encrypt"] = "none"
+    # Short-lived bundle download token controls.
+    bundle_token_required: bool = True
+    bundle_token_ttl_seconds: int = 300
 
 
 class SchedulerConfig(BaseModel):
@@ -98,6 +103,9 @@ class EntryConfig(BaseModel):
     # Optional: embed credentials directly or via ${ENV_VAR}
     credentials: CredentialsConfig = Field(default_factory=CredentialsConfig)
     token: str | None = None
+    # Delivery targeting metadata used by scheduler/job routing.
+    target_type: str = "generic"
+    target_scope: str | None = None
 
 
 class AppConfig(BaseModel):

@@ -388,6 +388,29 @@ generate_x25519_keypair(
 3. When the agent detects an `envelope` field in the response, it automatically decrypts using its local X25519 private key.
 4. If the server has encryption disabled, or the node lacks an encryption key, the bundle falls back to plaintext mode — backwards-compatible with older agents.
 
+### 9.3 Bundle short-lived token (enabled by default)
+
+To reduce the exploit window after credential leakage, bundle downloads now require a short-lived token by default:
+
+- Poll response includes `bundle_token` and `bundle_token_expires_at`.
+- Bundle download requires `bundle_token` in addition to signature parameters.
+- The token is bound to `node_id + job_id + exp` and signed with server key material using HMAC-SHA256.
+
+```toml
+[server]
+# default true: enforce bundle download token
+bundle_token_required = true
+# token lifetime in seconds
+bundle_token_ttl_seconds = 300
+```
+
+Compatibility mode (recommended only during migration window):
+
+```toml
+[server]
+bundle_token_required = false
+```
+
 ## 10. Target Mapping Table
 
 | Target Type | Recommended Delivery | Activation | Validation |
@@ -407,16 +430,17 @@ Implemented:
 
 1. Agent loop mode is now available.
 2. Agent execution chain is complete: poll -> bundle -> execute -> result.
-3. Bundle endpoint is implemented with signature and nonce replay protection.
-4. NodeExecutor supports local file delivery and hooks.
+3. node-agent supports `subscribe`, `heartbeat`, and `callback` endpoints for push+pull compatibility.
+4. Job model supports `target_type` and `target_scope` fields.
+5. Bundle download supports short-lived token enforcement (enabled by default, configurable).
+6. Scheduler supports `--target-scope` for network-segment renewal scans.
+7. NodeExecutor supports nginx/openresty/k8s-ingress adapters (MVP) selected by `target_type`.
 
-Next steps:
+Next steps (high priority):
 
-1. Add explicit subscribe and heartbeat APIs for push-plus-pull hybrid mode.
-2. Add delivery target type and network-scope fields to job model.
-3. Add short-lived bundle token and finer-grained permissions.
-4. Add scheduler target-scope scanning.
-5. Add more adapters for nginx/openresty/k8s ingress specifics.
+1. Upgrade `subscribe` into a real server-side event delivery channel (current endpoint is compatibility-oriented; pull remains primary).
+2. Integrate k8s-ingress adapter with real cluster apply/rollback flow (current MVP outputs TLS Secret YAML).
+3. Add upgrade and troubleshooting playbook for default-on bundle token policy in API/Ops docs.
 
 ## 12. Conclusion
 

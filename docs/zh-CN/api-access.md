@@ -31,6 +31,7 @@ uv run certman-mcp --endpoint http://127.0.0.1:8000
 
 1. `cert_create` 与 `cert_renew` 为异步语义，仅返回 `job_id`，需配合 `job_wait` 等待终态。
 2. 当前事件主题为 job 级（`job.queued`、`job.completed`、`job.failed`），证书级事件属于后续 addon/plugin 集成规划。
+3. `job_list` 支持 `target_scope` 参数（用于多环境/多集群分段查询）。
 
 ## 2.2 REST Token 鉴权策略（server 模式）
 
@@ -50,6 +51,22 @@ Token 解析优先级（override）：
 - 缺少 token：`401 AUTH_MISSING_TOKEN`
 - token 不匹配：`401 AUTH_INVALID_TOKEN`
 - 当前目标没有可用 token（item/global 都空）：`500 AUTH_TOKEN_CONFIG_ERROR`
+
+## 2.3 Node-Agent 协议面（机器对机器）
+
+当前节点协议接口：
+
+- `POST /api/v1/node-agent/poll`
+- `POST /api/v1/node-agent/subscribe`
+- `POST /api/v1/node-agent/heartbeat`
+- `POST /api/v1/node-agent/result`
+- `POST /api/v1/node-agent/callback`
+
+说明：
+
+1. `poll/subscribe` 响应中的 assignment 可携带 `bundle_token` 与 `bundle_token_expires_at`。
+2. 当 `[server].bundle_token_required = true`（默认）时，下载 bundle 必须附带该短时 token。
+3. `subscribe` 为长轮询语义，建议 agent 开启 `control_plane.prefer_subscribe=true`。
 
 示例配置：
 
@@ -119,6 +136,8 @@ token = "site-a-token"
 如果目标是生成 typed client 或直接挂工具，优先用 REST + OpenAPI。
 
 若服务端开启 token 鉴权，请通过 `certmanctl --token`（或环境变量 `CERTMAN_SERVER_TOKEN`）传递 Bearer token。
+
+若节点协议启用 bundle token（默认开启），请确保 agent 使用 poll/subscribe 返回的 `bundle_token` 下载 bundle，且处理过期重试。
 
 ## 5. cert-manager addon/plugin 规划状态
 

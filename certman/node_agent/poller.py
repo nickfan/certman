@@ -75,6 +75,8 @@ class NodePoller:
         register_token: str | None = None,
         encryption_private_key_path: str | Path | None = None,
         encryption_public_key_path: str | Path | None = None,
+        prefer_subscribe: bool = False,
+        subscribe_wait_seconds: int = 25,
     ):
         """
         Initialize agent poller.
@@ -99,6 +101,8 @@ class NodePoller:
         self._register_token = register_token
         self._encryption_private_key_path = Path(encryption_private_key_path) if encryption_private_key_path else None
         self._encryption_public_key_path = Path(encryption_public_key_path) if encryption_public_key_path else None
+        self._prefer_subscribe = prefer_subscribe
+        self._subscribe_wait_seconds = max(0, subscribe_wait_seconds)
         self._last_registration = RegistrationOutcome(success=True, retryable=False, code="REGISTER_NOT_REQUIRED", message="registration not required")
 
     @property
@@ -139,6 +143,11 @@ class NodePoller:
             "agent_version": "0.1.0",
             "signature": signature,
         }
+        if self._prefer_subscribe:
+            assignments = self._subscribe(payload)
+            if assignments is not None:
+                return assignments
+
         try:
             response = httpx.post(f"{self._endpoint.rstrip('/')}/api/v1/node-agent/poll", json=payload, timeout=10)
             if response.status_code != 200:
@@ -147,7 +156,23 @@ class NodePoller:
         except (httpx.HTTPError, ValueError):
             return []
 
-    def fetch_bundle(self, *, job_id: str, bundle_url: str) -> dict | None:
+    def _subscribe(self, payload: dict) -> list[dict] | None:
+        try:
+            response = httpx.post(
+                f"{self._endpoint.rstrip('/')}/api/v1/node-agent/subscribe",
+                json=payload,
+                params={"wait_seconds": self._subscribe_wait_seconds},
+                timeout=max(10, self._subscribe_wait_seconds + 10),
+            )
+            if response.status_code == 404:
+                return None
+            if response.status_code != 200:
+                return []
+            return response.json().get("data", {}).get("assignments", [])
+        except (httpx.HTTPError, ValueError):
+            return []
+
+    def fetch_bundle(self, *, job_id: str, bundle_url: str, bundle_token: str | None = None) -> dict | None:
         if self._private_key_path is None or not self._private_key_path.exists():
             return None
 
@@ -170,6 +195,8 @@ class NodePoller:
             "nonce": nonce,
             "signature": signature,
         }
+        if bundle_token:
+            params["bundle_token"] = bundle_token
         try:
             response = httpx.get(endpoint, params=params, timeout=10)
             if response.status_code != 200:

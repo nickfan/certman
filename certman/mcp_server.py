@@ -119,6 +119,7 @@ def create_mcp_server(config: McpServerConfig):
     def job_list(
         subject_id: str | None = None,
         status: str | None = None,
+        target_scope: str | None = None,
         limit: int = 50,
     ) -> list[dict[str, Any]]:
         """List jobs with optional filters."""
@@ -127,6 +128,8 @@ def create_mcp_server(config: McpServerConfig):
             params["subject_id"] = subject_id
         if status:
             params["status"] = status
+        if target_scope:
+            params["target_scope"] = target_scope
         return _call_api(method="GET", path="/api/v1/jobs", params=params, config=config)
 
     @mcp.tool()

@@ -31,6 +31,7 @@ Notes:
 
 1. `cert_create` and `cert_renew` are asynchronous: they return `job_id`; use `job_wait` to wait for terminal state.
 2. Current event topics are job-level (`job.queued`, `job.completed`, `job.failed`). Certificate-level events are planned for addon/plugin integration.
+3. `job_list` supports the `target_scope` filter for segmented multi-environment operations.
 
 ## 2.2 REST token auth policy (server mode)
 
@@ -50,6 +51,22 @@ Behavior when auth is enabled:
 - missing required bearer token: `401 AUTH_MISSING_TOKEN`
 - wrong token: `401 AUTH_INVALID_TOKEN`
 - no effective token configured for current target: `500 AUTH_TOKEN_CONFIG_ERROR`
+
+## 2.3 Node-Agent machine protocol surface
+
+Current node protocol endpoints:
+
+- `POST /api/v1/node-agent/poll`
+- `POST /api/v1/node-agent/subscribe`
+- `POST /api/v1/node-agent/heartbeat`
+- `POST /api/v1/node-agent/result`
+- `POST /api/v1/node-agent/callback`
+
+Notes:
+
+1. poll/subscribe assignments may include `bundle_token` and `bundle_token_expires_at`.
+2. when `[server].bundle_token_required = true` (default), bundle download requires the short-lived token.
+3. `subscribe` is a long-poll endpoint; enable `control_plane.prefer_subscribe=true` on agents when low-latency dispatch is needed.
 
 Example config:
 
@@ -119,6 +136,8 @@ Use `certmanctl` when you want stable operator UX and predictable exit codes.
 Use REST + OpenAPI when you want typed client generation or direct tool integration.
 
 When server token auth is enabled, pass `--token` (or `CERTMAN_SERVER_TOKEN`) to `certmanctl`.
+
+When bundle token policy is enabled (default), agents must download bundles using the `bundle_token` returned by poll/subscribe and handle token expiry retries.
 
 ## 5. cert-manager addon/plugin planning status
 

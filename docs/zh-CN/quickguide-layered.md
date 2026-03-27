@@ -86,6 +86,8 @@ db_path = "data/run/certman.db"
 listen_host = "127.0.0.1"
 listen_port = 8000
 signing_key_path = "data/run/keys/server_ed25519.pem"
+bundle_token_required = true
+bundle_token_ttl_seconds = 300
 ```
 
 2. 启动 server 与 worker（两个终端）
@@ -111,6 +113,8 @@ curl -X POST http://127.0.0.1:8000/api/v1/certificates \
   -d '{"entry_name":"site-a"}'
 
 curl http://127.0.0.1:8000/api/v1/jobs/<job_id>
+
+curl "http://127.0.0.1:8000/api/v1/jobs?target_scope=prod-cn&limit=20"
 ```
 
 5. 使用远程 CLI 跑同一条链路
@@ -131,6 +135,8 @@ run_mode = "agent"
 [control_plane]
 endpoint = "http://127.0.0.1:8000"
 poll_interval_seconds = 30
+prefer_subscribe = true
+subscribe_wait_seconds = 25
 
 [node_identity]
 node_id = "node-a"
@@ -161,3 +167,5 @@ node_id=node-a poll_count=1
 - job 长期 queued：检查 worker 是否启动，且 server/worker 的 db_path 是否同一文件。
 - agent 401：检查 node 状态是否 active、公钥是否匹配、系统时间偏差是否过大。
 - agent 409 replay：同一 nonce 重放，被控制面拒绝，属于预期安全行为。
+- 拉取 bundle 返回 401/403：检查 agent 是否从 poll/subscribe 响应带上 `bundle_token` 调用下载接口，且服务端 `bundle_token_ttl_seconds` 未过短。
+- 任务到达延迟高：启用 `prefer_subscribe=true` 并确认 `/api/v1/node-agent/subscribe` 长轮询链路可达。

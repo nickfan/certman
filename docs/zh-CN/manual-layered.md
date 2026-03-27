@@ -21,6 +21,8 @@
 | server.listen_host | API 监听地址 | 0.0.0.0 | Service |
 | server.listen_port | API 监听端口 | 8000 | Service |
 | server.signing_key_path | 服务端签名私钥 | null | Service/Agent |
+| server.bundle_token_required | 是否要求短时 bundle token | true | Service/Agent |
+| server.bundle_token_ttl_seconds | bundle token 有效期（秒） | 300 | Service/Agent |
 | scheduler.enabled | 调度全局开关 | false | Service/Scheduler |
 | scheduler.mode | 调度模式 loop/cron | loop | Scheduler |
 | scheduler.scan_interval_seconds | loop 间隔秒数 | 300 | Scheduler |
@@ -29,8 +31,12 @@
 | scheduler.renew_before_days | 提前 N 天入队 renew | 30 | Scheduler |
 | control_plane.endpoint | 控制面地址 | 无 | Agent |
 | control_plane.poll_interval_seconds | 轮询周期（秒） | 30 | Agent |
+| control_plane.prefer_subscribe | 是否优先 subscribe 长轮询 | false | Agent |
+| control_plane.subscribe_wait_seconds | subscribe 等待秒数 | 25 | Agent |
 | node_identity.node_id | 节点唯一标识 | 无 | Agent |
 | node_identity.private_key_path | 节点私钥路径 | 无 | Agent |
+| entries[].target_type | 目标类型（generic/nginx/openresty/k8s-ingress） | generic | Service/Agent |
+| entries[].target_scope | 目标作用域（环境/集群标签） | null | Service/Agent |
 
 ## 3. CLI 命令手册
 
@@ -174,7 +180,7 @@ POST /api/v1/certificates/{entry_name}/renew
 
 GET /api/v1/jobs
 
-- 支持 `subject_id`、`status`、`limit` 查询过滤。
+- 支持 `subject_id`、`status`、`target_scope`、`limit` 查询过滤。
 
 GET /api/v1/jobs/{job_id}
 
@@ -238,9 +244,28 @@ POST /api/v1/node-agent/poll
 
 - 服务端校验签名。
 - nonce 入库，重复 nonce 返回 409（防重放）。
-- 成功后尝试分配任务并回传 bundle_signature。
+- 成功后尝试分配任务并回传 bundle_signature；当开启短时令牌策略时还会返回 `bundle_token` 与 `bundle_token_expires_at`。
 
-### 5.2 result
+### 5.2 subscribe
+
+POST /api/v1/node-agent/subscribe
+
+语义：
+
+- 与 poll 使用同一签名和 nonce 规则。
+- 服务端执行长轮询，等待作业事件或超时。
+- 命中任务时直接返回 assignments，未命中返回空列表并由 agent 回退到 poll。
+
+### 5.3 heartbeat
+
+POST /api/v1/node-agent/heartbeat
+
+语义：
+
+- 轻量活跃探测，更新节点在线状态。
+- 失败时不改变 job 状态，仅作为链路监控信号。
+
+### 5.4 callback / result
 
 POST /api/v1/node-agent/result
 
@@ -255,6 +280,10 @@ POST /api/v1/node-agent/result
 - 仅 running 任务可更新结果。
 - 任务 node_id 必须与上报 node_id 一致（若已绑定）。
 - 签名覆盖 job_id/status/output/error 组合载荷。
+
+POST /api/v1/node-agent/callback
+
+- 语义与 result 一致，保留给节点回调语义化入口。
 
 ## 6. 远程 CLI 手册（`certmanctl`）
 
@@ -275,10 +304,13 @@ POST /api/v1/node-agent/result
 
 当前 MCP 工具包含：health、cert_*、job_*、webhook_*、config_list/config_get/config_validate。
 
+其中 `job_list` 支持 `target_scope` 过滤，便于多环境分批观测。
+
 ## 7.1 Scheduler 运行模式
 
 - 常驻模式：`uv run certman-scheduler run --data-dir data --config-file config.toml --loop`
 - 一次性模式：`uv run certman-scheduler once --data-dir data --config-file config.toml --force-enable`
+- 作用域调度：在上述命令追加 `--target-scope <scope>`
 - K8s CronJob 示例：`k8s/certman-scheduler-cronjob.yaml`
 
 ## 8. 状态机与并发语义

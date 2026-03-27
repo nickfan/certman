@@ -23,8 +23,8 @@ Commands:
 
 ## Scheduler surface: certman-scheduler
 
-- `run --loop|--once [--force-enable] [--renew-before-days <n>]`
-- `once [--force-enable] [--renew-before-days <n>]`
+- `run --loop|--once [--force-enable] [--renew-before-days <n>] [--target-scope <scope>]`
+- `once [--force-enable] [--renew-before-days <n>] [--target-scope <scope>]`
 
 ## Remote surface: certmanctl
 
@@ -75,6 +75,6 @@ Tools:
 
 - `health`
 - `cert_create`, `cert_list`, `cert_get`, `cert_renew`
-- `job_get`, `job_list`, `job_wait`
+- `job_get`, `job_list(subject_id?, status?, target_scope?, limit=50)`, `job_wait`
 - `webhook_create`, `webhook_list`, `webhook_get`, `webhook_update`, `webhook_delete`
 - `config_list`, `config_get`, `config_validate`

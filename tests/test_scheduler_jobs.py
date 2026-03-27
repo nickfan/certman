@@ -68,3 +68,25 @@ def test_schedule_due_renewals_publishes_event(tmp_path: Path) -> None:
 
     assert events[0]["job_type"] == "renew"
     assert events[0]["subject_id"] == "site-a"
+
+
+def test_schedule_due_renewals_filters_by_target_scope(tmp_path: Path) -> None:
+    db_path = tmp_path / "certman.db"
+    JobService(db_path=db_path)
+    _insert_certificate(db_path, entry_name="site-a", days_left=5)
+    _insert_certificate(db_path, entry_name="site-b", days_left=5)
+
+    created_jobs = schedule_due_renewals(
+        db_path=db_path,
+        now=datetime.now(timezone.utc),
+        renew_before_days=30,
+        target_scope="office",
+        entry_targets={
+            "site-a": ("nginx", "office"),
+            "site-b": ("k8s-ingress", "prod"),
+        },
+    )
+
+    assert len(created_jobs) == 1
+    assert created_jobs[0].subject_id == "site-a"
+    assert created_jobs[0].target_scope == "office"

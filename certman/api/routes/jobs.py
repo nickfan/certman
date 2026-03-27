@@ -23,6 +23,7 @@ def list_jobs(
     http_request: Request,
     subject_id: Optional[str] = Query(None, description="Filter by subject_id"),
     status: Optional[str] = Query(None, description="Filter by status"),
+    target_scope: Optional[str] = Query(None, description="Filter by target_scope"),
     limit: int = Query(50, ge=1, le=200, description="Max results to return"),
     service: JobService = Depends(get_job_service),
 ) -> ApiResponse[list[JobResponse]]:
@@ -30,7 +31,7 @@ def list_jobs(
         require_entry_token_if_configured(http_request, subject_id)
     else:
         require_global_token_if_configured(http_request)
-    jobs = service.list_jobs(subject_id=subject_id, status=status, limit=limit)
+    jobs = service.list_jobs(subject_id=subject_id, status=status, target_scope=target_scope, limit=limit)
     return ApiResponse(
         success=True,
         data=[JobResponse(**j.model_dump()) for j in jobs],

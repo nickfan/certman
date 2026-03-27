@@ -49,6 +49,7 @@ db_path = "data/run/certman.db"
 listen_host = "127.0.0.1"
 listen_port = 8000
 signing_key_path = "data/run/keys/server.pem"
+bundle_token_required = false
 
 [[entries]]
 name = "site-a"
@@ -314,6 +315,39 @@ def test_node_agent_poll_throttles_last_seen_updates(tmp_path: Path) -> None:
         assert node.last_seen_updated_at > first_updated_at
 
 
+def test_node_agent_subscribe_long_poll_delivers_assignment(tmp_path: Path) -> None:
+    client, node_private_path, db_path = _prepare_server_with_node(tmp_path)
+    private_key = load_ed25519_private_key(node_private_path)
+    job_service = JobService(db_path=db_path)
+    job_service.create_job(job_type="renew", subject_id="site-a", node_id="node-a")
+
+    timestamp = int(datetime.now(timezone.utc).timestamp())
+    signature = sign_message(
+        private_key,
+        node_id="node-a",
+        timestamp=timestamp,
+        nonce="nonce-subscribe-1",
+        payload=b"",
+    )
+
+    response = client.post(
+        "/api/v1/node-agent/subscribe?wait_seconds=1",
+        json={
+            "node_id": "node-a",
+            "timestamp": timestamp,
+            "nonce": "nonce-subscribe-1",
+            "agent_version": "0.1.0",
+            "signature": signature,
+        },
+    )
+
+    assert response.status_code == 200
+    assignments = response.json()["data"]["assignments"]
+    assert len(assignments) == 1
+    assert assignments[0]["job_type"] == "renew"
+    assert assignments[0]["bundle_token"] is not None
+
+
 def test_node_agent_bundle_download_encrypted(tmp_path: Path) -> None:
     """Bundle returned as ECIES envelope when server bundle_encryption=encrypt and node has X25519 key."""
     data_dir = tmp_path / "data"
@@ -346,6 +380,7 @@ listen_host = "127.0.0.1"
 listen_port = 8000
 signing_key_path = "data/run/keys/server.pem"
 bundle_encryption = "encrypt"
+bundle_token_required = false
 
 [[entries]]
 name = "site-a"
@@ -403,6 +438,46 @@ dns_provider = "route53"
             "signature": signature,
         },
     )
+    if response.status_code == 401 and response.json().get("error", {}).get("code") == "AUTH_BUNDLE_TOKEN_REQUIRED":
+        poll_ts = int(datetime.now(timezone.utc).timestamp())
+        poll_sig = sign_message(
+            private_key,
+            node_id="node-a",
+            timestamp=poll_ts,
+            nonce="nonce-enc-poll",
+            payload=b"",
+        )
+        poll_resp = client.post(
+            "/api/v1/node-agent/poll",
+            json={
+                "node_id": "node-a",
+                "timestamp": poll_ts,
+                "nonce": "nonce-enc-poll",
+                "agent_version": "0.1.0",
+                "signature": poll_sig,
+            },
+        )
+        assert poll_resp.status_code == 200
+        token = poll_resp.json()["data"]["assignments"][0]["bundle_token"]
+
+        timestamp = int(datetime.now(timezone.utc).timestamp())
+        signature = sign_message(
+            private_key,
+            node_id="node-a",
+            timestamp=timestamp,
+            nonce="nonce-enc-bundle-token",
+            payload=payload_bytes,
+        )
+        response = client.get(
+            f"/api/v1/node-agent/bundles/{created_job.job_id}",
+            params={
+                "node_id": "node-a",
+                "timestamp": timestamp,
+                "nonce": "nonce-enc-bundle-token",
+                "signature": signature,
+                "bundle_token": token,
+            },
+        )
     assert response.status_code == 200
     data = response.json()["data"]
 
@@ -463,6 +538,46 @@ def test_node_agent_bundle_download_with_signature(tmp_path: Path) -> None:
             "signature": signature,
         },
     )
+    if response.status_code == 401 and response.json().get("error", {}).get("code") == "AUTH_BUNDLE_TOKEN_REQUIRED":
+        poll_ts = int(datetime.now(timezone.utc).timestamp())
+        poll_sig = sign_message(
+            private_key,
+            node_id="node-a",
+            timestamp=poll_ts,
+            nonce="nonce-bundle-poll-1",
+            payload=b"",
+        )
+        poll_resp = client.post(
+            "/api/v1/node-agent/poll",
+            json={
+                "node_id": "node-a",
+                "timestamp": poll_ts,
+                "nonce": "nonce-bundle-poll-1",
+                "agent_version": "0.1.0",
+                "signature": poll_sig,
+            },
+        )
+        assert poll_resp.status_code == 200
+        token = poll_resp.json()["data"]["assignments"][0]["bundle_token"]
+
+        ts2 = int(datetime.now(timezone.utc).timestamp())
+        sig2 = sign_message(
+            private_key,
+            node_id="node-a",
+            timestamp=ts2,
+            nonce="nonce-bundle-2",
+            payload=payload_bytes,
+        )
+        response = client.get(
+            f"/api/v1/node-agent/bundles/{job.job_id}",
+            params={
+                "node_id": "node-a",
+                "timestamp": ts2,
+                "nonce": "nonce-bundle-2",
+                "signature": sig2,
+                "bundle_token": token,
+            },
+        )
 
     assert response.status_code == 200
     data = response.json()["data"]
@@ -470,3 +585,199 @@ def test_node_agent_bundle_download_with_signature(tmp_path: Path) -> None:
     assert data["bundle"]["entry_name"] == "site-a"
     assert data["bundle"]["files"]["fullchain.pem"] == "fullchain-data"
     assert data["bundle"]["files"]["privkey.pem"] == "privkey-data"
+
+
+def test_node_agent_bundle_download_requires_token_when_enabled(tmp_path: Path) -> None:
+    data_dir = tmp_path / "data"
+    conf_dir = data_dir / "conf"
+    key_dir = data_dir / "run" / "keys"
+    conf_dir.mkdir(parents=True)
+    key_dir.mkdir(parents=True)
+
+    node_private = key_dir / "node-a.pem"
+    node_public = key_dir / "node-a.pub.pem"
+    server_private = key_dir / "server.pem"
+    server_public = key_dir / "server.pub.pem"
+    generate_ed25519_keypair(node_private, node_public)
+    generate_ed25519_keypair(server_private, server_public)
+
+    (conf_dir / "config.toml").write_text(
+        """
+run_mode = "server"
+
+[global]
+data_dir = "data"
+email = "ops@example.com"
+
+[server]
+db_path = "data/run/certman.db"
+listen_host = "127.0.0.1"
+listen_port = 8000
+signing_key_path = "data/run/keys/server.pem"
+bundle_token_required = true
+
+[[entries]]
+name = "site-a"
+primary_domain = "site-a.example.com"
+dns_provider = "route53"
+""".strip(),
+        encoding="utf-8",
+    )
+
+    runtime = create_runtime(data_dir=str(data_dir), config_file="config.toml")
+    db_path = resolve_runtime_path(runtime, runtime.config.server.db_path)
+    job_service = JobService(db_path=db_path)
+    session_factory = make_session_factory(db_path)
+    with session_factory() as session:
+        session.add(
+            NodeORM(
+                node_id="node-a",
+                node_type="agent",
+                public_key=node_public.read_text(encoding="utf-8"),
+                status="active",
+            )
+        )
+        session.commit()
+
+    live_dir = runtime.paths.run_dir / "letsencrypt" / "live" / "site-a.example.com"
+    live_dir.mkdir(parents=True)
+    (live_dir / "fullchain.pem").write_text("fullchain-data", encoding="utf-8")
+    (live_dir / "privkey.pem").write_text("privkey-data", encoding="utf-8")
+
+    job = job_service.create_job(job_type="renew", subject_id="site-a", node_id="node-a")
+
+    client = TestClient(create_app(data_dir=str(data_dir), config_file="config.toml"))
+    private_key = load_ed25519_private_key(node_private)
+
+    # Poll once to claim job and obtain short-lived bundle token.
+    poll_ts = int(datetime.now(timezone.utc).timestamp())
+    poll_sig = sign_message(private_key, node_id="node-a", timestamp=poll_ts, nonce="nonce-poll-token", payload=b"")
+    poll_resp = client.post(
+        "/api/v1/node-agent/poll",
+        json={
+            "node_id": "node-a",
+            "timestamp": poll_ts,
+            "nonce": "nonce-poll-token",
+            "agent_version": "0.1.0",
+            "signature": poll_sig,
+        },
+    )
+    assert poll_resp.status_code == 200
+    assignment = poll_resp.json()["data"]["assignments"][0]
+    token = assignment["bundle_token"]
+    assert token
+
+    # Missing token should be rejected.
+    ts_missing = int(datetime.now(timezone.utc).timestamp())
+    sig_missing = sign_message(
+        private_key,
+        node_id="node-a",
+        timestamp=ts_missing,
+        nonce="nonce-bundle-missing-token",
+        payload=json.dumps({"job_id": job.job_id}, separators=(",", ":"), sort_keys=True).encode("utf-8"),
+    )
+    missing_resp = client.get(
+        f"/api/v1/node-agent/bundles/{job.job_id}",
+        params={
+            "node_id": "node-a",
+            "timestamp": ts_missing,
+            "nonce": "nonce-bundle-missing-token",
+            "signature": sig_missing,
+        },
+    )
+    assert missing_resp.status_code == 401
+    assert missing_resp.json()["error"]["code"] == "AUTH_BUNDLE_TOKEN_REQUIRED"
+
+    # Valid token should pass.
+    ts_ok = int(datetime.now(timezone.utc).timestamp())
+    sig_ok = sign_message(
+        private_key,
+        node_id="node-a",
+        timestamp=ts_ok,
+        nonce="nonce-bundle-with-token",
+        payload=json.dumps({"job_id": job.job_id}, separators=(",", ":"), sort_keys=True).encode("utf-8"),
+    )
+    ok_resp = client.get(
+        f"/api/v1/node-agent/bundles/{job.job_id}",
+        params={
+            "node_id": "node-a",
+            "timestamp": ts_ok,
+            "nonce": "nonce-bundle-with-token",
+            "signature": sig_ok,
+            "bundle_token": token,
+        },
+    )
+    assert ok_resp.status_code == 200
+
+
+def test_node_agent_heartbeat_endpoint_updates_liveness(tmp_path: Path) -> None:
+    client, node_private_path, _ = _prepare_server_with_node(tmp_path)
+    private_key = load_ed25519_private_key(node_private_path)
+    timestamp = int(datetime.now(timezone.utc).timestamp())
+    signature = sign_message(
+        private_key,
+        node_id="node-a",
+        timestamp=timestamp,
+        nonce="nonce-heartbeat-1",
+        payload=b"",
+    )
+
+    response = client.post(
+        "/api/v1/node-agent/heartbeat",
+        json={
+            "node_id": "node-a",
+            "timestamp": timestamp,
+            "nonce": "nonce-heartbeat-1",
+            "agent_version": "0.1.0",
+            "signature": signature,
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["data"]["assignments"] == []
+
+
+def test_node_agent_callback_alias_updates_job_status(tmp_path: Path) -> None:
+    client, node_private_path, db_path = _prepare_server_with_node(tmp_path)
+    job_service = JobService(db_path=db_path)
+    job = job_service.create_job(job_type="issue", subject_id="site-a", node_id="node-a")
+    job_service.update_status(job.job_id, status="running")
+    private_key = load_ed25519_private_key(node_private_path)
+    timestamp = int(datetime.now(timezone.utc).timestamp())
+    output = "ok-callback"
+    signed_payload = json.dumps(
+        {
+            "job_id": job.job_id,
+            "status": "completed",
+            "output": output,
+            "error": None,
+        },
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    signature = sign_message(
+        private_key,
+        node_id="node-a",
+        timestamp=timestamp,
+        nonce="nonce-callback-1",
+        payload=signed_payload,
+    )
+
+    response = client.post(
+        "/api/v1/node-agent/callback",
+        json={
+            "node_id": "node-a",
+            "job_id": job.job_id,
+            "status": "completed",
+            "output": output,
+            "error": None,
+            "timestamp": timestamp,
+            "nonce": "nonce-callback-1",
+            "signature": signature,
+        },
+    )
+
+    updated = job_service.get_job(job.job_id)
+    assert response.status_code == 200
+    assert updated is not None
+    assert updated.status == "completed"
+    assert updated.result == "ok-callback"

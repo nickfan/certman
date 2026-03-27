@@ -67,9 +67,11 @@ renew_before_days = 18
 
     observed: dict[str, object] = {}
 
-    def fake_schedule_due_renewals(*, db_path, now=None, renew_before_days=30, event_bus=None):
+    def fake_schedule_due_renewals(*, db_path, now=None, renew_before_days=30, target_scope=None, entry_targets=None, event_bus=None):
         observed["db_path"] = db_path
         observed["renew_before_days"] = renew_before_days
+        observed["target_scope"] = target_scope
+        observed["entry_targets"] = entry_targets
         return [object(), object()]
 
     monkeypatch.setattr("certman.scheduler.runner.schedule_due_renewals", fake_schedule_due_renewals)
@@ -78,6 +80,8 @@ renew_before_days = 18
 
     assert result == 2
     assert observed["renew_before_days"] == 18
+    assert observed["target_scope"] is None
+    assert isinstance(observed["entry_targets"], dict)
 
 
 def test_matches_cron_requires_five_fields() -> None:
@@ -89,11 +93,19 @@ def test_matches_cron_requires_five_fields() -> None:
 def test_once_command_delegates_to_run_once(monkeypatch) -> None:
     observed: dict[str, object] = {}
 
-    def fake_run_once(*, data_dir: str, config_file: str | None, force_enable: bool, renew_before_days: int | None):
+    def fake_run_once(
+        *,
+        data_dir: str,
+        config_file: str | None,
+        force_enable: bool,
+        renew_before_days: int | None,
+        target_scope: str | None,
+    ):
         observed["data_dir"] = data_dir
         observed["config_file"] = config_file
         observed["force_enable"] = force_enable
         observed["renew_before_days"] = renew_before_days
+        observed["target_scope"] = target_scope
         return 1
 
     monkeypatch.setattr("certman.scheduler.runner.run_once", fake_run_once)
@@ -110,6 +122,8 @@ def test_once_command_delegates_to_run_once(monkeypatch) -> None:
             "--force-enable",
             "--renew-before-days",
             "21",
+            "--target-scope",
+            "office",
         ],
     )
 
@@ -118,3 +132,4 @@ def test_once_command_delegates_to_run_once(monkeypatch) -> None:
     assert observed["config_file"] == "config.toml"
     assert observed["force_enable"] is True
     assert observed["renew_before_days"] == 21
+    assert observed["target_scope"] == "office"

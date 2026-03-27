@@ -78,6 +78,7 @@ def run_once(
     config_file: str | None = None,
     force_enable: bool = False,
     renew_before_days: int | None = None,
+    target_scope: str | None = None,
 ) -> int:
     runtime = create_runtime(data_dir=data_dir, config_file=config_file)
     if runtime.config.server is None:
@@ -90,8 +91,14 @@ def run_once(
 
     renew_days = renew_before_days if renew_before_days is not None else scheduler_cfg.renew_before_days
     db_path = resolve_runtime_path(runtime, runtime.config.server.db_path)
-    created_jobs = schedule_due_renewals(db_path=db_path, renew_before_days=renew_days)
-    typer.echo(f"scheduled={len(created_jobs)} renew_before_days={renew_days}")
+    entry_targets = {entry.name: (entry.target_type, entry.target_scope) for entry in runtime.config.entries}
+    created_jobs = schedule_due_renewals(
+        db_path=db_path,
+        renew_before_days=renew_days,
+        target_scope=target_scope,
+        entry_targets=entry_targets,
+    )
+    typer.echo(f"scheduled={len(created_jobs)} renew_before_days={renew_days} target_scope={target_scope or 'all'}")
     return len(created_jobs)
 
 
@@ -102,6 +109,7 @@ def run(
     once: bool = typer.Option(False, "--once/--loop"),
     force_enable: bool = typer.Option(False, "--force-enable"),
     renew_before_days: int | None = typer.Option(None, "--renew-before-days"),
+    target_scope: str | None = typer.Option(None, "--target-scope"),
     interval_seconds: int | None = typer.Option(None, "--interval-seconds"),
 ) -> None:
     """Run standalone certificate renewal scheduler."""
@@ -116,6 +124,7 @@ def run(
             config_file=config_file,
             force_enable=force_enable,
             renew_before_days=renew_before_days,
+            target_scope=target_scope,
         )
         return
 
@@ -133,6 +142,7 @@ def run(
                 config_file=config_file,
                 force_enable=force_enable,
                 renew_before_days=renew_before_days,
+                target_scope=target_scope,
             )
             time.sleep(max(1, sleep_seconds))
         return
@@ -150,6 +160,7 @@ def run(
                 config_file=config_file,
                 force_enable=force_enable,
                 renew_before_days=renew_before_days,
+                target_scope=target_scope,
             )
             last_trigger_key = trigger_key
         time.sleep(max(1, poll_seconds))
@@ -161,6 +172,7 @@ def once(
     config_file: str | None = typer.Option(None, "--config-file", "-c", envvar="CERTMAN_CONFIG_FILE"),
     force_enable: bool = typer.Option(False, "--force-enable"),
     renew_before_days: int | None = typer.Option(None, "--renew-before-days"),
+    target_scope: str | None = typer.Option(None, "--target-scope"),
 ) -> None:
     """Run exactly one scheduler scan and exit."""
     run_once(
@@ -168,6 +180,7 @@ def once(
         config_file=config_file,
         force_enable=force_enable,
         renew_before_days=renew_before_days,
+        target_scope=target_scope,
     )
 
 

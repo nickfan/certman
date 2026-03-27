@@ -80,6 +80,8 @@ def run(
             if runtime.config.node_identity.encryption_public_key_path
             else None
         ),
+        prefer_subscribe=runtime.config.control_plane.prefer_subscribe,
+        subscribe_wait_seconds=runtime.config.control_plane.subscribe_wait_seconds,
     )
 
     executor = NodeExecutor()
@@ -100,10 +102,11 @@ def run(
         for assignment in assignments:
             job_id = assignment.get("job_id")
             bundle_url = assignment.get("bundle_url")
+            bundle_token = assignment.get("bundle_token")
             if not job_id or not bundle_url:
                 continue
 
-            bundle_data = poller.fetch_bundle(job_id=job_id, bundle_url=bundle_url)
+            bundle_data = poller.fetch_bundle(job_id=job_id, bundle_url=bundle_url, bundle_token=bundle_token)
             if bundle_data is None:
                 poller.report_result(job_id=job_id, status="failed", error="bundle download failed")
                 processed += 1

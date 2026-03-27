@@ -183,3 +183,68 @@ uv run certmanctl --endpoint http://127.0.0.1:8000 webhook list
 
 - `--endpoint` 配错时属于 CLI 传输失败，不是 API 业务错误。
 - `job wait` 只有在 job 进入 `completed`、`failed` 或 `cancelled` 后才会退出。
+
+## 场景 9：按 target_scope 进行续签调度（Scheduler）
+
+目标：在多环境/多集群下只调度指定作用域（例如 `prod-cn`）。
+
+操作：
+
+```bash
+uv run certman-scheduler once --data-dir data --config-file config.toml --force-enable --target-scope prod-cn
+```
+
+验证：
+
+- 调度输出中的 `target_scope=prod-cn`。
+- 通过 REST `GET /api/v1/jobs?target_scope=prod-cn` 能看到新建任务。
+
+常见坑：
+
+- 条目未配置 `target_scope` 时不会被该过滤命中。
+
+## 场景 10：节点 subscribe + heartbeat + callback（Agent -> Service）
+
+目标：缩短任务分发延迟并上报节点活跃状态。
+
+操作：
+
+1. agent 配置开启：`control_plane.prefer_subscribe=true`。
+2. 节点优先调用 `/api/v1/node-agent/subscribe`，无任务再回退 `/poll`。
+3. 节点定期调用 `/api/v1/node-agent/heartbeat`。
+4. 执行完成后调用 `/api/v1/node-agent/callback` 回传状态。
+
+验证：
+
+- subscribe 返回 assignments 时可直接领取任务。
+- heartbeat 返回 `ok=true`。
+- callback 后 job 状态进入 `completed/failed`。
+
+常见坑：
+
+- subscribe 与 poll 使用不同签名/nonce 会被拒绝，必须保持与 poll 一致的签名规则。
+
+## 场景 11：k8s-ingress 交付 apply + rollback（Agent）
+
+目标：在 Kubernetes 目标上直接落地 Secret，失败时尽量回滚。
+
+条目示例：
+
+```toml
+target_type = "k8s-ingress"
+target_scope = "prod-cn"
+```
+
+运行策略：
+
+- `delivery_options.mode=apply` 时使用 `kubectl apply`。
+- `delivery_options.rollback_on_failure=true` 时 apply 失败后尝试恢复先前 Secret。
+
+验证：
+
+- 成功时 Secret 被更新。
+- 失败时日志包含 rollback 尝试记录。
+
+常见坑：
+
+- agent 运行节点缺少 `kubectl` 或 kubeconfig 权限不足。

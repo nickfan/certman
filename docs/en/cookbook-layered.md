@@ -133,3 +133,68 @@ Pitfalls:
 
 - wrong `--endpoint` is a transport problem, not an API business error.
 - `job wait` exits only after `completed`, `failed`, or `cancelled`.
+
+## Scenario 9: Scope-Filtered Scheduling (Scheduler)
+
+Goal: schedule renew jobs only for a specific target scope (for example `prod-cn`).
+
+Steps:
+
+```bash
+uv run certman-scheduler once --data-dir data --config-file config.toml --force-enable --target-scope prod-cn
+```
+
+Validation:
+
+- scheduler output prints `target_scope=prod-cn`.
+- `GET /api/v1/jobs?target_scope=prod-cn` returns the newly created jobs.
+
+Pitfalls:
+
+- entries without `target_scope` are not matched by this filter.
+
+## Scenario 10: subscribe + heartbeat + callback (Agent -> Service)
+
+Goal: reduce assignment latency and report node liveness.
+
+Steps:
+
+1. Set `control_plane.prefer_subscribe=true` in agent config.
+2. Agent prefers `/api/v1/node-agent/subscribe`, then falls back to `/poll`.
+3. Agent periodically reports `/api/v1/node-agent/heartbeat`.
+4. Agent reports completion via `/api/v1/node-agent/callback`.
+
+Validation:
+
+- subscribe response may include immediate assignments.
+- heartbeat returns `ok=true`.
+- callback transitions job status to `completed/failed`.
+
+Pitfalls:
+
+- subscribe and poll use the same signature/nonce rules; mismatch is rejected.
+
+## Scenario 11: k8s-ingress apply + rollback (Agent)
+
+Goal: apply certificate material to Kubernetes Secret and attempt rollback on failure.
+
+Entry example:
+
+```toml
+target_type = "k8s-ingress"
+target_scope = "prod-cn"
+```
+
+Runtime behavior:
+
+- `delivery_options.mode=apply` uses `kubectl apply`.
+- `delivery_options.rollback_on_failure=true` attempts to restore the previous Secret when apply fails.
+
+Validation:
+
+- successful runs update the Secret.
+- failed runs log rollback attempts.
+
+Pitfalls:
+
+- missing `kubectl` or insufficient kubeconfig permissions on the agent node.

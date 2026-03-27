@@ -75,11 +75,17 @@ def issue_certificate(
     if not payload.entry_name:
         raise HTTPException(status_code=400, detail={"code": "INVALID_ENTRY", "message": "entry_name is required"})
     runtime = http_request.app.state.runtime
-    if not any(entry.name == payload.entry_name for entry in runtime.config.entries):
+    entry = next((entry for entry in runtime.config.entries if entry.name == payload.entry_name), None)
+    if entry is None:
         raise HTTPException(status_code=404, detail={"code": "NOT_FOUND_ENTRY", "message": "entry not found"})
     require_entry_token_if_configured(http_request, payload.entry_name)
 
-    job = service.create_job(job_type="issue", subject_id=payload.entry_name)
+    job = service.create_job(
+        job_type="issue",
+        subject_id=payload.entry_name,
+        target_type=entry.target_type,
+        target_scope=entry.target_scope,
+    )
     if event_bus is not None:
         event_bus.publish("job.queued", job.model_dump())
     return ApiResponse(success=True, data=JobAcceptedResponse(job_id=job.job_id))
@@ -102,11 +108,17 @@ def renew_certificate(
 ) -> ApiResponse[RenewJobAcceptedResponse]:
     """Enqueue a renewal job for the given entry (idempotent)."""
     runtime = http_request.app.state.runtime
-    if not any(entry.name == entry_name for entry in runtime.config.entries):
+    entry = next((entry for entry in runtime.config.entries if entry.name == entry_name), None)
+    if entry is None:
         raise HTTPException(status_code=404, detail={"code": "NOT_FOUND_ENTRY", "message": "entry not found"})
     require_entry_token_if_configured(http_request, entry_name)
 
-    job, created = service.enqueue_unique_job(job_type="renew", subject_id=entry_name)
+    job, created = service.enqueue_unique_job(
+        job_type="renew",
+        subject_id=entry_name,
+        target_type=entry.target_type,
+        target_scope=entry.target_scope,
+    )
     if event_bus is not None and created:
         event_bus.publish("job.queued", job.model_dump())
     return ApiResponse(success=True, data=RenewJobAcceptedResponse(job_id=job.job_id, created=created))

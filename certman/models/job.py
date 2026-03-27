@@ -9,6 +9,8 @@ class JobRecord(BaseModel):
     job_id: str
     job_type: str
     subject_id: str
+    target_type: str = "generic"
+    target_scope: str | None = None
     node_id: str | None = None
     status: str = "queued"
     attempts: int = 0

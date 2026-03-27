@@ -19,11 +19,21 @@ class JobService:
         Base.metadata.create_all(self._engine)
         self._session_factory = make_session_factory(self._db_path)
 
-    def create_job(self, *, job_type: str, subject_id: str, node_id: str | None = None) -> JobRecord:
+    def create_job(
+        self,
+        *,
+        job_type: str,
+        subject_id: str,
+        node_id: str | None = None,
+        target_type: str = "generic",
+        target_scope: str | None = None,
+    ) -> JobRecord:
         job = JobORM(
             job_id=uuid4().hex[:12],
             job_type=job_type,
             subject_id=subject_id,
+            target_type=target_type,
+            target_scope=target_scope,
             node_id=node_id,
             status="queued",
             attempts=0,
@@ -43,12 +53,16 @@ class JobService:
         job_type: str,
         subject_id: str,
         node_id: str | None = None,
+        target_type: str = "generic",
+        target_scope: str | None = None,
     ) -> tuple[JobRecord, bool]:
         now = datetime.now(timezone.utc)
         job = JobORM(
             job_id=uuid4().hex[:12],
             job_type=job_type,
             subject_id=subject_id,
+            target_type=target_type,
+            target_scope=target_scope,
             node_id=node_id,
             status="queued",
             attempts=0,
@@ -86,6 +100,7 @@ class JobService:
         *,
         subject_id: str | None = None,
         status: str | None = None,
+        target_scope: str | None = None,
         limit: int = 50,
     ) -> list[JobRecord]:
         with self._session_factory() as session:
@@ -94,6 +109,8 @@ class JobService:
                 query = query.filter(JobORM.subject_id == subject_id)
             if status is not None:
                 query = query.filter(JobORM.status == status)
+            if target_scope is not None:
+                query = query.filter(JobORM.target_scope == target_scope)
             jobs = query.order_by(JobORM.created_at.desc()).limit(limit).all()
             return [self._to_record(j) for j in jobs]
 
@@ -110,7 +127,13 @@ class JobService:
             session.commit()
             return self._to_record(job)
 
-    def claim_next_job(self, *, node_id: str | None = None, include_unassigned: bool = True) -> JobRecord | None:
+    def claim_next_job(
+        self,
+        *,
+        node_id: str | None = None,
+        include_unassigned: bool = True,
+        target_scope: str | None = None,
+    ) -> JobRecord | None:
         now = datetime.now(timezone.utc)
         with self._session_factory() as session:
             row = session.execute(
@@ -125,6 +148,7 @@ class JobService:
                         SELECT job_id
                         FROM job
                         WHERE status = 'queued'
+                                                    AND (:target_scope IS NULL OR target_scope = :target_scope)
                           AND (
                             :node_id IS NULL
                             OR node_id = :node_id
@@ -133,12 +157,13 @@ class JobService:
                         ORDER BY created_at ASC
                         LIMIT 1
                     )
-                    RETURNING job_id, job_type, subject_id, node_id, status, attempts, result, error, created_at, updated_at
+                    RETURNING job_id, job_type, subject_id, target_type, target_scope, node_id, status, attempts, result, error, created_at, updated_at
                     """
                 ),
                 {
                     "updated_at": now,
                     "node_id": node_id,
+                    "target_scope": target_scope,
                     "include_unassigned": 1 if include_unassigned else 0,
                 },
             ).mappings().first()
@@ -149,6 +174,8 @@ class JobService:
                 job_id=row["job_id"],
                 job_type=row["job_type"],
                 subject_id=row["subject_id"],
+                target_type=row["target_type"],
+                target_scope=row["target_scope"],
                 node_id=row["node_id"],
                 status=row["status"],
                 attempts=row["attempts"],
@@ -164,6 +191,8 @@ class JobService:
             job_id=job.job_id,
             job_type=job.job_type,
             subject_id=job.subject_id,
+            target_type=job.target_type,
+            target_scope=job.target_scope,
             node_id=job.node_id,
             status=job.status,
             attempts=job.attempts,

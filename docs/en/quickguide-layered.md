@@ -69,6 +69,8 @@ db_path = "data/run/certman.db"
 listen_host = "127.0.0.1"
 listen_port = 8000
 signing_key_path = "data/run/keys/server_ed25519.pem"
+bundle_token_required = true
+bundle_token_ttl_seconds = 300
 ```
 
 2. Start server and worker
@@ -94,6 +96,8 @@ curl -X POST http://127.0.0.1:8000/api/v1/certificates \
   -d '{"entry_name":"site-a"}'
 
 curl http://127.0.0.1:8000/api/v1/jobs/<job_id>
+
+curl "http://127.0.0.1:8000/api/v1/jobs?target_scope=prod-cn&limit=20"
 ```
 
 5. Repeat the same flow with the remote CLI
@@ -114,6 +118,8 @@ run_mode = "agent"
 [control_plane]
 endpoint = "http://127.0.0.1:8000"
 poll_interval_seconds = 30
+prefer_subscribe = true
+subscribe_wait_seconds = 25
 
 [node_identity]
 node_id = "node-a"
@@ -142,3 +148,5 @@ node_id=node-a poll_count=1
 - jobs stuck in queued: verify worker is running and shares same db_path.
 - agent 401: verify node active status, public key match, and time skew.
 - agent 409 replay: duplicated nonce was rejected by design.
+- bundle download returns 401/403: ensure the agent forwards `bundle_token` from poll/subscribe response, and `bundle_token_ttl_seconds` is not too small.
+- high assignment latency: enable `prefer_subscribe=true` and verify `/api/v1/node-agent/subscribe` long-poll reachability.
