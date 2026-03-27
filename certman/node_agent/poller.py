@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import json
 from pathlib import Path
 from uuid import uuid4
 
@@ -136,6 +137,87 @@ class NodePoller:
         except (httpx.HTTPError, ValueError):
             return []
 
+    def fetch_bundle(self, *, job_id: str, bundle_url: str) -> dict | None:
+        if self._private_key_path is None or not self._private_key_path.exists():
+            return None
+
+        timestamp = int(datetime.now(timezone.utc).timestamp())
+        nonce = uuid4().hex
+        private_key = load_ed25519_private_key(self._private_key_path)
+        payload_bytes = self._job_payload_bytes(job_id)
+        signature = sign_message(
+            private_key,
+            node_id=self._node_id,
+            timestamp=timestamp,
+            nonce=nonce,
+            payload=payload_bytes,
+        )
+
+        endpoint = self._resolve_url(bundle_url)
+        params = {
+            "node_id": self._node_id,
+            "timestamp": timestamp,
+            "nonce": nonce,
+            "signature": signature,
+        }
+        try:
+            response = httpx.get(endpoint, params=params, timeout=10)
+            if response.status_code != 200:
+                return None
+            return response.json().get("data")
+        except (httpx.HTTPError, ValueError):
+            return None
+
+    def report_result(
+        self,
+        *,
+        job_id: str,
+        status: str,
+        output: str | None = None,
+        error: str | None = None,
+    ) -> bool:
+        if self._private_key_path is None or not self._private_key_path.exists():
+            return False
+
+        timestamp = int(datetime.now(timezone.utc).timestamp())
+        nonce = uuid4().hex
+        private_key = load_ed25519_private_key(self._private_key_path)
+
+        body = {
+            "job_id": job_id,
+            "status": status,
+            "output": output,
+            "error": error,
+        }
+        payload_bytes = json.dumps(body, separators=(",", ":"), sort_keys=True).encode("utf-8")
+        signature = sign_message(
+            private_key,
+            node_id=self._node_id,
+            timestamp=timestamp,
+            nonce=nonce,
+            payload=payload_bytes,
+        )
+
+        request_body = {
+            "node_id": self._node_id,
+            "job_id": job_id,
+            "status": status,
+            "output": output,
+            "error": error,
+            "timestamp": timestamp,
+            "nonce": nonce,
+            "signature": signature,
+        }
+        try:
+            response = httpx.post(
+                f"{self._endpoint.rstrip('/')}/api/v1/node-agent/result",
+                json=request_body,
+                timeout=10,
+            )
+            return response.status_code == 200
+        except (httpx.HTTPError, ValueError):
+            return False
+
     def ensure_registered(self) -> RegistrationOutcome:
         """
         Register agent node with server (first-time only).
@@ -202,3 +284,13 @@ class NodePoller:
             encoding=serialization.Encoding.PEM,
             format=serialization.PublicFormat.SubjectPublicKeyInfo,
         ).decode("utf-8")
+
+    def _resolve_url(self, path_or_url: str) -> str:
+        normalized = path_or_url.strip()
+        if normalized.startswith("http://") or normalized.startswith("https://"):
+            return normalized
+        return f"{self._endpoint.rstrip('/')}/{normalized.lstrip('/')}"
+
+    @staticmethod
+    def _job_payload_bytes(job_id: str) -> bytes:
+        return json.dumps({"job_id": job_id}, separators=(",", ":"), sort_keys=True).encode("utf-8")

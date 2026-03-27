@@ -243,3 +243,9 @@ class ConfigValidateRequest(BaseModel):
 
 class ConfigValidateResponse(BaseModel):
     ok: bool = True
+
+
+class BundleResponse(BaseModel):
+    job_id: str = Field(description="Assigned job ID", examples=["a1b2c3d4e5f6"])
+    bundle: dict = Field(description="Bundle payload for node execution")
+    hooks: list[dict] = Field(default_factory=list, description="Hook definitions to execute after delivery")

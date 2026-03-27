@@ -35,6 +35,10 @@
   - 配置参数影响范围
   - API 契约、状态机、并发与安全基线
 
+- **[复杂混合网络证书治理方案](complex-hybrid-certificate-topology.md)** - 多云 + 本地 + 开发机统一证书生命周期落地
+  - 含处理流程、时序图、拓扑图、分阶段实施方案
+  - 覆盖 Aliyun/AWS/Cloudflare 与线上线下混合端点
+
 - **[API 与 AI 接入 (api-access.md)](api-access.md)** - OpenAPI 地址、远程 CLI 用法与 AI 接入现状
   - `/docs`、`/redoc`、`/openapi.json`
   - `certmanctl` 与 REST 的对应关系
@@ -56,6 +60,7 @@
 
 - [Kubernetes 部署设计 (../k8s-service-design.md)](../k8s-service-design.md)
 - [双 CLI 模式说明 (dual-cli-modes.md)](dual-cli-modes.md)
+- [复杂混合网络证书治理方案 (complex-hybrid-certificate-topology.md)](complex-hybrid-certificate-topology.md)
 - [双 CLI 实施总方案 (../notes/plans/2026-03-26-dual-cli-program.md)](../notes/plans/2026-03-26-dual-cli-program.md)
 - [cert-manager 协作扩展规划 (../plans/2026-03-27-cert-manager-addon-plugin-plan.md)](../plans/2026-03-27-cert-manager-addon-plugin-plan.md)
 - [cert-manager 协作模式图解（流程图/时序图 + FAQ） (../certman-cert-manager-collaboration-modes.md)](../certman-cert-manager-collaboration-modes.md)

@@ -6,17 +6,19 @@ import json
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.exc import IntegrityError
 from cryptography.hazmat.primitives import serialization
 
 from certman.api.deps import get_job_service
-from certman.api.schemas import ApiResponse, PollAssignmentResponse, PollRequest, PollResponse, ResultAckResponse, ResultReportRequest
+from certman.api.schemas import ApiResponse, BundleResponse, PollAssignmentResponse, PollRequest, PollResponse, ResultAckResponse, ResultReportRequest
+from certman.config import entry_domains
 from certman.config import resolve_runtime_path
 from certman.db.engine import make_session_factory
 from certman.db.models import NodeNonceORM, NodeORM
 from certman.security.identity import load_ed25519_private_key
 from certman.security.signing import SecurityError, sign_message, verify_message
+from certman.services.cert_service import resolve_entry_cert_name
 from certman.services.job_service import JobService
 
 router = APIRouter(prefix="/api/v1/node-agent", tags=["node-agent"])
@@ -125,6 +127,55 @@ def report_result(payload: ResultReportRequest, request: Request, service: JobSe
     )
 
 
+@router.get(
+    "/bundles/{job_id}",
+    response_model=ApiResponse[BundleResponse],
+    summary="Download assignment bundle",
+    description="Return certificate bundle files for a running node-assigned job after signature and replay verification.",
+    response_description="Certificate files and hook definitions",
+)
+def download_bundle(
+    job_id: str,
+    request: Request,
+    node_id: str = Query(..., description="Requesting node identifier"),
+    timestamp: int = Query(..., description="Unix timestamp in seconds"),
+    nonce: str = Query(..., description="Single-use nonce for replay protection"),
+    signature: str = Query(..., description="Ed25519 signature over node_id/timestamp/nonce/job_id payload"),
+    service: JobService = Depends(get_job_service),
+) -> ApiResponse[BundleResponse]:
+    runtime = request.app.state.runtime
+    node = _get_active_node(runtime, node_id)
+    public_key = serialization.load_pem_public_key(node.public_key_pem.encode("utf-8"))
+
+    signed_payload = json.dumps({"job_id": job_id}, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    try:
+        verify_message(
+            public_key,
+            signature,
+            node_id=node_id,
+            timestamp=timestamp,
+            nonce=nonce,
+            payload=signed_payload,
+        )
+    except SecurityError as exc:
+        raise HTTPException(status_code=401, detail={"code": "AUTH_INVALID_SIGNATURE", "message": str(exc)}) from exc
+
+    _store_nonce_or_conflict(runtime, node_id, nonce)
+    _touch_node_last_seen(runtime, node_id)
+
+    job = service.get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail={"code": "NOT_FOUND_JOB", "message": "job not found"})
+    if job.status != "running":
+        raise HTTPException(status_code=422, detail={"code": "SEMANTIC_INVALID_JOB_STATE", "message": "job is not running"})
+    if job.node_id is not None and job.node_id != node_id:
+        raise HTTPException(status_code=401, detail={"code": "AUTH_NODE_NOT_ALLOWED", "message": "job does not belong to node"})
+
+    bundle = _load_job_bundle_files(runtime, job.subject_id)
+    hooks = [hook.model_dump() for hook in runtime.config.hooks]
+    return ApiResponse(success=True, data=BundleResponse(job_id=job_id, bundle=bundle, hooks=hooks))
+
+
 def _get_active_node(runtime, node_id: str) -> ActiveNode:
     db_path = resolve_runtime_path(runtime, runtime.config.server.db_path)
     session_factory = make_session_factory(db_path)
@@ -208,3 +259,45 @@ def _result_payload_bytes(payload: ResultReportRequest) -> bytes:
         "error": payload.error,
     }
     return json.dumps(body, separators=(",", ":"), sort_keys=True).encode("utf-8")
+
+
+def _load_job_bundle_files(runtime, entry_name: str) -> dict:
+    target = [entry for entry in runtime.config.entries if entry.name == entry_name]
+    if not target:
+        raise HTTPException(status_code=404, detail={"code": "NOT_FOUND_ENTRY", "message": "entry not found"})
+    entry = target[0]
+
+    try:
+        cert_name = resolve_entry_cert_name(runtime, entry, require_existing_lineage=False, resolution_mode="latest")
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail={"code": "NOT_FOUND_BUNDLE", "message": str(exc)}) from exc
+
+    base = runtime.paths.run_dir / runtime.config.global_.letsencrypt_dir / "live" / cert_name
+    fullchain = base / "fullchain.pem"
+    privkey = base / "privkey.pem"
+    cert = base / "cert.pem"
+    chain = base / "chain.pem"
+
+    required_paths = [fullchain, privkey]
+    missing = [str(path) for path in required_paths if not path.exists()]
+    if missing:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "NOT_FOUND_BUNDLE", "message": f"bundle files missing: {', '.join(missing)}"},
+        )
+
+    files = {
+        "fullchain.pem": fullchain.read_text(encoding="utf-8"),
+        "privkey.pem": privkey.read_text(encoding="utf-8"),
+    }
+    if cert.exists():
+        files["cert.pem"] = cert.read_text(encoding="utf-8")
+    if chain.exists():
+        files["chain.pem"] = chain.read_text(encoding="utf-8")
+
+    return {
+        "entry_name": entry.name,
+        "primary_domain": entry.primary_domain,
+        "domains": entry_domains(entry),
+        "files": files,
+    }

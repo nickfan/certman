@@ -45,6 +45,11 @@ db_path = "data/run/certman.db"
 listen_host = "127.0.0.1"
 listen_port = 8000
 signing_key_path = "data/run/keys/server.pem"
+
+[[entries]]
+name = "site-a"
+primary_domain = "site-a.example.com"
+dns_provider = "route53"
 """.strip(),
         encoding="utf-8",
     )
@@ -303,3 +308,47 @@ def test_node_agent_poll_throttles_last_seen_updates(tmp_path: Path) -> None:
     with session_factory() as session:
         node = session.query(NodeORM).filter(NodeORM.node_id == "node-a").first()
         assert node.last_seen_updated_at > first_updated_at
+
+
+def test_node_agent_bundle_download_with_signature(tmp_path: Path) -> None:
+    client, node_private_path, db_path = _prepare_server_with_node(tmp_path)
+    private_key = load_ed25519_private_key(node_private_path)
+
+    data_dir = tmp_path / "data"
+    live_dir = data_dir / "run" / "letsencrypt" / "live" / "site-a.example.com"
+    live_dir.mkdir(parents=True)
+    (live_dir / "fullchain.pem").write_text("fullchain-data", encoding="utf-8")
+    (live_dir / "privkey.pem").write_text("privkey-data", encoding="utf-8")
+    (live_dir / "cert.pem").write_text("cert-data", encoding="utf-8")
+    (live_dir / "chain.pem").write_text("chain-data", encoding="utf-8")
+
+    job_service = JobService(db_path=db_path)
+    job = job_service.create_job(job_type="renew", subject_id="site-a", node_id="node-a")
+    job_service.update_status(job.job_id, status="running")
+
+    timestamp = int(datetime.now(timezone.utc).timestamp())
+    payload_bytes = json.dumps({"job_id": job.job_id}, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    signature = sign_message(
+        private_key,
+        node_id="node-a",
+        timestamp=timestamp,
+        nonce="nonce-bundle-1",
+        payload=payload_bytes,
+    )
+
+    response = client.get(
+        f"/api/v1/node-agent/bundles/{job.job_id}",
+        params={
+            "node_id": "node-a",
+            "timestamp": timestamp,
+            "nonce": "nonce-bundle-1",
+            "signature": signature,
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["job_id"] == job.job_id
+    assert data["bundle"]["entry_name"] == "site-a"
+    assert data["bundle"]["files"]["fullchain.pem"] == "fullchain-data"
+    assert data["bundle"]["files"]["privkey.pem"] == "privkey-data"

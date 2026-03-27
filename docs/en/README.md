@@ -35,6 +35,10 @@
   - config parameter impact map
   - API contracts, state machine, concurrency and security baseline
 
+- **[Complex Hybrid Certificate Topology Guide](complex-hybrid-certificate-topology.md)** - end-to-end hybrid network certificate governance
+  - includes background topology, target architecture, workflow and sequence diagrams
+  - includes implemented status and next-step plan
+
 - **[API & AI Access (api-access.md)](api-access.md)** - OpenAPI endpoints, remote CLI usage, and current AI integration surface
   - `/docs`, `/redoc`, `/openapi.json`
   - `certmanctl` to REST mapping
@@ -56,6 +60,7 @@
 
 - [Kubernetes Service Design (../k8s-service-design.md)](../k8s-service-design.md)
 - [Dual CLI Modes (dual-cli-modes.md)](dual-cli-modes.md)
+- [Complex Hybrid Certificate Topology Guide (complex-hybrid-certificate-topology.md)](complex-hybrid-certificate-topology.md)
 - [Dual CLI Program Plan (../notes/plans/2026-03-26-dual-cli-program.md)](../notes/plans/2026-03-26-dual-cli-program.md)
 - [cert-manager Addon/Plugin Plan (../plans/2026-03-27-cert-manager-addon-plugin-plan.md)](../plans/2026-03-27-cert-manager-addon-plugin-plan.md)
 - [cert-manager Collaboration Modes (../certman-cert-manager-collaboration-modes.md)](../certman-cert-manager-collaboration-modes.md)
@@ -126,6 +131,7 @@ docs/
 - 🔗 [CLI Help Reference](cli-help-reference.md)
 - 🔗 [Provider Setup](../dns-providers.md)
 - 🔗 [Dual CLI Modes](dual-cli-modes.md)
+- 🔗 [Complex Hybrid Certificate Topology Guide](complex-hybrid-certificate-topology.md)
 
 ---
 
