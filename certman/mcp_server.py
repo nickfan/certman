@@ -209,14 +209,18 @@ def _parse_args() -> McpServerConfig:
     parser = argparse.ArgumentParser(description="CertMan MCP server")
     parser.add_argument("--endpoint", default="http://127.0.0.1:8000", help="Control-plane endpoint")
     parser.add_argument("--timeout", type=float, default=10.0, help="HTTP timeout in seconds")
-    parser.add_argument("--token", default=None, help="Optional bearer token (fallback to CERTMAN_MCP_TOKEN)")
+    parser.add_argument(
+        "--token",
+        default=None,
+        help="Optional bearer token (fallback: CERTMAN_MCP_TOKEN, then CERTMAN_SERVER_TOKEN)",
+    )
     parser.add_argument("--poll-interval", type=float, default=3.0, help="job_wait poll interval in seconds")
     parser.add_argument("--max-wait", type=float, default=120.0, help="job_wait max wait seconds")
     args = parser.parse_args()
     return McpServerConfig(
         endpoint=args.endpoint.rstrip("/"),
         timeout=args.timeout,
-        token=args.token if args.token is not None else os.getenv("CERTMAN_MCP_TOKEN"),
+        token=args.token if args.token is not None else (os.getenv("CERTMAN_MCP_TOKEN") or os.getenv("CERTMAN_SERVER_TOKEN")),
         poll_interval=args.poll_interval,
         max_wait=args.max_wait,
     )

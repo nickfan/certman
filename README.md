@@ -141,6 +141,8 @@ curl -X POST http://127.0.0.1:8000/api/v1/webhooks \
   -d '{"topic":"job.completed","endpoint":"https://example.test/hook","secret":"topsecret"}'
 ```
 
+If `[server].token_auth_enabled = true`, add `Authorization: Bearer <token>` for protected REST endpoints.
+
 Control-plane API documentation endpoints:
 
 ```text
@@ -304,6 +306,10 @@ Recommended flow:
 ## Control Plane Notes
 
 - `run_mode = "server"` requires a `[server]` block with `db_path`, `listen_host`, and `listen_port`.
+- Optional REST auth switch: `[server].token_auth_enabled` (default `false`).
+- Token precedence for certificate/job APIs when auth is enabled: `entries[].token` > `global.token`.
+- If auth is enabled but no effective token exists for the current target, API returns `500 AUTH_TOKEN_CONFIG_ERROR`.
+- If auth is enabled and token is required: missing token returns `401 AUTH_MISSING_TOKEN`, wrong token returns `401 AUTH_INVALID_TOKEN`.
 - Webhook subscriptions are stored in the control-plane database and receive signed HTTP POST callbacks.
 - `certman-worker` processes queued jobs from the same SQLite database used by `certman-server`.
 - `certman-agent` remains the controlled-node entrypoint; Phase 4 security primitives are now available for its next control-plane integration step.

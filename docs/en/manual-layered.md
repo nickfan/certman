@@ -93,6 +93,14 @@ These endpoints are exposed directly by `certman-server`.
 
 ### 4.1 Certificate APIs
 
+Auth policy for certificate/job REST APIs:
+
+- disabled by default: `[server].token_auth_enabled = false`
+- when enabled: bearer token is required and resolved by `entries[].token` > `global.token`
+- enabled but no effective token for current target: `500 AUTH_TOKEN_CONFIG_ERROR`
+- enabled + missing token: `401 AUTH_MISSING_TOKEN`
+- enabled + wrong token: `401 AUTH_INVALID_TOKEN`
+
 POST /api/v1/certificates
 
 ```json

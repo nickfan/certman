@@ -21,10 +21,14 @@
 - `uv run certmanctl --help`
 - `uv run certmanctl job wait --help`
 3. Keep `--limit` within 1-200.
+4. Auth check:
+- if `[server].token_auth_enabled = false`, token is optional
+- if `[server].token_auth_enabled = true`, provide `--token` or `CERTMAN_SERVER_TOKEN`
+- if server returns `AUTH_TOKEN_CONFIG_ERROR`, report server-side token config issue (`entries[].token` > `global.token`)
 
 ## MCP (certman-mcp)
 
 1. Confirm server endpoint reachable first.
 2. Start MCP server with endpoint.
-3. If auth required, inject token via environment variable.
+3. If auth required, inject token via `--token` or env var (`CERTMAN_MCP_TOKEN`, fallback `CERTMAN_SERVER_TOKEN`).
 4. On tool failures, classify as transport/api/timeout/validation.

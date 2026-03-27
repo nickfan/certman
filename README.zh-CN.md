@@ -114,6 +114,8 @@ curl -X POST http://127.0.0.1:8000/api/v1/webhooks \
   -d '{"topic":"job.completed","endpoint":"https://example.test/hook","secret":"topsecret"}'
 ```
 
+若配置 `[server].token_auth_enabled = true`，受保护的 REST 接口需要携带 `Authorization: Bearer <token>`。
+
 控制面 API 文档地址：
 
 ```text
@@ -237,6 +239,10 @@ docker compose run --rm certman check --warn-days 30 --force-renew-days 7 --fix
 ## 控制面说明
 
 - `run_mode = "server"` 时必须配置 `[server]`，至少包含 `db_path`、`listen_host`、`listen_port`
+- REST 鉴权总开关：`[server].token_auth_enabled`（默认 `false`）
+- 开启鉴权后，证书/job 接口 token 优先级：`entries[].token` > `global.token`
+- 若已开启鉴权，但当前请求目标既无 item token 也无 global token，返回 `500 AUTH_TOKEN_CONFIG_ERROR`
+- 若已开启鉴权且需要 token：缺少 token 返回 `401 AUTH_MISSING_TOKEN`，token 错误返回 `401 AUTH_INVALID_TOKEN`
 - webhook 订阅和投递记录持久化在控制面数据库中
 - `certman-worker` 与 `certman-server` 共享同一份 SQLite 数据库
 - `certman-agent` 仍是受控节点入口，Phase 4 的签名/加密原语已就绪，后续可继续扩展远程通信链路

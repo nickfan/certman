@@ -106,6 +106,14 @@ uv run certman -D data export --name site-a --overwrite
 
 ### 4.1 证书相关 API
 
+证书/job REST 鉴权策略：
+
+- 默认关闭：`[server].token_auth_enabled = false`
+- 开启后要求 Bearer token，解析优先级：`entries[].token` > `global.token`
+- 已开启但当前目标无有效 token：`500 AUTH_TOKEN_CONFIG_ERROR`
+- 已开启且缺少 token：`401 AUTH_MISSING_TOKEN`
+- 已开启且 token 错误：`401 AUTH_INVALID_TOKEN`
+
 POST /api/v1/certificates
 
 请求：

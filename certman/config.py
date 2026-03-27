@@ -24,6 +24,7 @@ class GlobalConfig(BaseModel):
 
     acme_server: str = "staging"  # staging|prod
     email: str = "admin@example.com"
+    token: str | None = None
 
 
 class ControlPlaneConfig(BaseModel):
@@ -36,6 +37,7 @@ class ServerConfig(BaseModel):
     listen_host: str = "0.0.0.0"
     listen_port: int = 8000
     signing_key_path: str | None = None  # Ed25519 private key; required in Phase 4
+    token_auth_enabled: bool = False
 
 
 class NodeIdentityConfig(BaseModel):
@@ -74,6 +76,7 @@ class EntryConfig(BaseModel):
 
     # Optional: embed credentials directly or via ${ENV_VAR}
     credentials: CredentialsConfig = Field(default_factory=CredentialsConfig)
+    token: str | None = None
 
 
 class AppConfig(BaseModel):

@@ -32,6 +32,39 @@ Notes:
 1. `cert_create` and `cert_renew` are asynchronous: they return `job_id`; use `job_wait` to wait for terminal state.
 2. Current event topics are job-level (`job.queued`, `job.completed`, `job.failed`). Certificate-level events are planned for addon/plugin integration.
 
+## 2.2 REST token auth policy (server mode)
+
+REST auth for certificate/job APIs is controlled by server config:
+
+- `[server].token_auth_enabled = false` (default): REST certificate/job endpoints are open.
+- `[server].token_auth_enabled = true`: Bearer token is required for protected endpoints.
+
+Token resolution strategy (override precedence):
+
+1. `entries[].token` (item-level)
+2. `global.token`
+3. no token configured
+
+Behavior when auth is enabled:
+
+- missing required bearer token: `401 AUTH_MISSING_TOKEN`
+- wrong token: `401 AUTH_INVALID_TOKEN`
+- no effective token configured for current target: `500 AUTH_TOKEN_CONFIG_ERROR`
+
+Example config:
+
+```toml
+[global]
+token = "global-token"
+
+[server]
+token_auth_enabled = true
+
+[[entries]]
+name = "site-a"
+token = "site-a-token"
+```
+
 ## 3. `certmanctl` to REST mapping
 
 | `certmanctl` | REST endpoint |
@@ -60,6 +93,8 @@ Recommended order for AI tooling:
 
 Use `certmanctl` when you want stable operator UX and predictable exit codes.
 Use REST + OpenAPI when you want typed client generation or direct tool integration.
+
+When server token auth is enabled, pass `--token` (or `CERTMAN_SERVER_TOKEN`) to `certmanctl`.
 
 ## 5. cert-manager addon/plugin planning status
 

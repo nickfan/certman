@@ -65,6 +65,12 @@ uv run certmanctl webhook update --help
 - `--output`：`text` 或 `json`
 - `--token`：Bearer Token
 
+Token 说明：
+
+- 仅当服务端配置 `[server].token_auth_enabled = true` 时，`--token` 才是必需的。
+- 服务端 token 解析优先级为 `entries[].token` > `global.token`。
+- `--token` 同时支持环境变量 `CERTMAN_SERVER_TOKEN`。
+
 命令参数：
 
 - `health`：无命令级参数

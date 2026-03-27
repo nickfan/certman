@@ -65,6 +65,12 @@ Global options:
 - `--output`: `text` or `json`
 - `--token`: Bearer token
 
+Token note:
+
+- `--token` is required only when server config has `[server].token_auth_enabled = true`.
+- Server-side token resolution precedence is `entries[].token` > `global.token`.
+- `--token` also supports env var `CERTMAN_SERVER_TOKEN`.
+
 Command options:
 
 - `health`: no command-specific options

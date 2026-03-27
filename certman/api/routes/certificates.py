@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
+from certman.api.auth import require_entry_token_if_configured, require_global_token_if_configured
 from certman.api.deps import get_event_bus, get_job_service
 from certman.api.schemas import ApiResponse, IssueCertRequest, JobAcceptedResponse, JobResponse, RenewJobAcceptedResponse
 from certman.events import EventBus
@@ -18,9 +19,11 @@ router = APIRouter(prefix="/api/v1/certificates", tags=["certificates"])
     response_description="Recent issue and renew jobs",
 )
 def list_certificates(
+    http_request: Request,
     service: JobService = Depends(get_job_service),
 ) -> ApiResponse[list[JobResponse]]:
     """List all certificate jobs (issue + renew)."""
+    require_global_token_if_configured(http_request)
     jobs = service.list_jobs(limit=200)
     cert_jobs = [j for j in jobs if j.job_type in ("issue", "renew")]
     return ApiResponse(
@@ -46,6 +49,7 @@ def get_certificate_jobs(
     runtime = http_request.app.state.runtime
     if not any(entry.name == entry_name for entry in runtime.config.entries):
         raise HTTPException(status_code=404, detail={"code": "NOT_FOUND_ENTRY", "message": "entry not found"})
+    require_entry_token_if_configured(http_request, entry_name)
     jobs = service.list_jobs(subject_id=entry_name, limit=50)
     return ApiResponse(
         success=True,
@@ -73,6 +77,7 @@ def issue_certificate(
     runtime = http_request.app.state.runtime
     if not any(entry.name == payload.entry_name for entry in runtime.config.entries):
         raise HTTPException(status_code=404, detail={"code": "NOT_FOUND_ENTRY", "message": "entry not found"})
+    require_entry_token_if_configured(http_request, payload.entry_name)
 
     job = service.create_job(job_type="issue", subject_id=payload.entry_name)
     if event_bus is not None:
@@ -99,6 +104,7 @@ def renew_certificate(
     runtime = http_request.app.state.runtime
     if not any(entry.name == entry_name for entry in runtime.config.entries):
         raise HTTPException(status_code=404, detail={"code": "NOT_FOUND_ENTRY", "message": "entry not found"})
+    require_entry_token_if_configured(http_request, entry_name)
 
     job, created = service.enqueue_unique_job(job_type="renew", subject_id=entry_name)
     if event_bus is not None and created:

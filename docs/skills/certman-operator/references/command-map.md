@@ -26,6 +26,12 @@ Global:
 - `--output text|json`
 - `--token <bearer>`
 
+Auth notes:
+
+- `certmanctl` env token: `CERTMAN_SERVER_TOKEN`
+- server-side auth switch: `[server].token_auth_enabled`
+- precedence when enabled: `entries[].token` > `global.token`
+
 Commands:
 
 - `health`
@@ -47,6 +53,11 @@ Commands:
 Server startup:
 
 - `uv run certman-mcp --endpoint http://127.0.0.1:8000`
+
+Auth notes:
+
+- `--token <bearer>` is optional client override
+- env fallback order: `CERTMAN_MCP_TOKEN`, then `CERTMAN_SERVER_TOKEN`
 
 Tools:
 
