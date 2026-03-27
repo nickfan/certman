@@ -434,13 +434,15 @@ Implemented:
 4. Job model supports `target_type` and `target_scope` fields.
 5. Bundle download supports short-lived token enforcement (enabled by default, configurable).
 6. Scheduler supports `--target-scope` for network-segment renewal scans.
-7. NodeExecutor supports nginx/openresty/k8s-ingress adapters (MVP) selected by `target_type`.
+7. NodeExecutor supports nginx/openresty/k8s-ingress adapters selected by `target_type`.
+8. `subscribe` now supports server-side event-wakeup long-poll with poll fallback retained.
+9. k8s-ingress adapter now supports `apply` mode and rollback attempts on failures (via `kubectl`).
 
 Next steps (high priority):
 
-1. Upgrade `subscribe` into a real server-side event delivery channel (current endpoint is compatibility-oriented; pull remains primary).
-2. Integrate k8s-ingress adapter with real cluster apply/rollback flow (current MVP outputs TLS Secret YAML).
-3. Add upgrade and troubleshooting playbook for default-on bundle token policy in API/Ops docs.
+1. Evolve `subscribe` from long-poll to optional SSE/WebSocket channels for lower connection overhead under high concurrency.
+2. Add `--dry-run` preflight and RBAC diagnostics for k8s-ingress adapter, plus richer rollback/error taxonomy.
+3. Add observability baselines for agent channels (subscribe hit ratio, bundle token expiry rate, callback success ratio) with alerting.
 
 ## 12. Conclusion
 

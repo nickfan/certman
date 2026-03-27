@@ -478,13 +478,15 @@ bundle_token_required = false
 4. job 模型已支持 `target_type` 与 `target_scope` 字段。
 5. bundle 下载已支持短时 token（默认强制，可配置关闭）。
 6. scheduler 已支持 `--target-scope` 参数按网络分区扫描续签。
-7. NodeExecutor 已支持按 `target_type` 选择 nginx/openresty/k8s-ingress 适配器（MVP）。
+7. NodeExecutor 已支持按 `target_type` 选择 nginx/openresty/k8s-ingress 适配器。
+8. `subscribe` 已支持服务端事件唤醒长轮询（并保留 poll 回退路径）。
+9. k8s-ingress 适配器已支持 `apply` 模式与失败回滚尝试（基于 `kubectl`）。
 
 后续建议（高优先级）：
 
-1. 将 `subscribe` 升级为真正的服务端事件下发通道（当前为兼容入口，核心仍是 pull）。
-2. 将 k8s-ingress 适配器接入真实集群 apply/回滚流程（当前输出 Secret YAML）。
-3. 在 API 文档和运维手册中补充“token 默认开启”的升级迁移说明与排障手册。
+1. 将 `subscribe` 从长轮询进一步升级为可选 SSE/WebSocket 事件通道，降低高并发场景连接开销。
+2. 为 k8s-ingress 适配器补充 `--dry-run` 预检与 RBAC 诊断，完善失败分类与自动化回滚策略。
+3. 增加 agent 通道可观测性（subscribe 命中率、bundle token 过期率、回调成功率）并纳入告警基线。
 
 ## 12. 结论
 
