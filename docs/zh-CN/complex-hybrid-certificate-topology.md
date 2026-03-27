@@ -294,9 +294,12 @@ sequenceDiagram
 Agent 与 Server 当前对接链路（已实现）：
 
 1. `POST /api/v1/nodes/register`：节点注册（一次性 token + 公钥）。
-2. `POST /api/v1/node-agent/poll`：签名轮询拉取任务。
-3. `GET /api/v1/node-agent/bundles/{job_id}`：签名下载证书包。
-4. `POST /api/v1/node-agent/result`：签名回传执行结果。
+2. `POST /api/v1/node-agent/poll`：签名轮询拉取任务（可下发短时 `bundle_token`）。
+3. `POST /api/v1/node-agent/subscribe`：签名长轮询订阅任务（事件唤醒，兼容 poll 回退）。
+4. `POST /api/v1/node-agent/heartbeat`：签名心跳上报。
+5. `GET /api/v1/node-agent/bundles/{job_id}`：签名下载证书包（默认要求 `bundle_token`）。
+6. `POST /api/v1/node-agent/result`：签名回传执行结果。
+7. `POST /api/v1/node-agent/callback`：回调语义入口（与 result 规则一致）。
 
 推荐能力分层：
 
