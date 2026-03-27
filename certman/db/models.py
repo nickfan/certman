@@ -46,6 +46,10 @@ class NodeORM(Base):
     node_id: Mapped[str] = mapped_column(String(128), primary_key=True)
     node_type: Mapped[str] = mapped_column(String(64))
     public_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Optional X25519 public key (PEM) supplied during registration.
+    # When present and server bundle_encryption=encrypt, bundles are
+    # ECIES-encrypted (X25519 ECDH + AES-256-GCM) before transmission.
+    encryption_public_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="active")
     last_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # Track when last_seen was last updated to implement 30-60s throttle window

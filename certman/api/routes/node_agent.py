@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+import gzip
 import json
 from pathlib import Path
 from uuid import uuid4
@@ -16,7 +17,8 @@ from certman.config import entry_domains
 from certman.config import resolve_runtime_path
 from certman.db.engine import make_session_factory
 from certman.db.models import NodeNonceORM, NodeORM
-from certman.security.identity import load_ed25519_private_key
+from certman.security.envelope import encrypt_envelope
+from certman.security.identity import load_ed25519_private_key, load_x25519_public_key
 from certman.security.signing import SecurityError, sign_message, verify_message
 from certman.services.cert_service import resolve_entry_cert_name
 from certman.services.job_service import JobService
@@ -29,6 +31,7 @@ NONCE_TTL_SECONDS = 3600
 class ActiveNode:
     node_id: str
     public_key_pem: str
+    encryption_public_key_pem: str | None = None
 
 
 @router.post(
@@ -173,6 +176,34 @@ def download_bundle(
 
     bundle = _load_job_bundle_files(runtime, job.subject_id)
     hooks = [hook.model_dump() for hook in runtime.config.hooks]
+
+    encryption_mode = (runtime.config.server.bundle_encryption if runtime.config.server else "none")
+    if encryption_mode == "encrypt" and node.encryption_public_key_pem:
+        plaintext = json.dumps({"bundle": bundle, "hooks": hooks}, ensure_ascii=False).encode("utf-8")
+        compress = False
+        # Check node-level compression preference stored as a side-channel:
+        # we don't have per-node compress flag in DB, so we use server-side heuristic:
+        # compress when plaintext > 4 KiB (certificate files are typically 3-6 KiB total).
+        if len(plaintext) > 4096:
+            plaintext = gzip.compress(plaintext, compresslevel=6)
+            compress = True
+        enc_pub = load_x25519_public_key_from_pem(node.encryption_public_key_pem)
+        envelope = encrypt_envelope(enc_pub, plaintext)
+        return ApiResponse(
+            success=True,
+            data=BundleResponse(
+                job_id=job_id,
+                bundle=None,
+                hooks=[],
+                envelope={
+                    "ephemeral_public_key": envelope.ephemeral_public_key,
+                    "nonce": envelope.nonce,
+                    "ciphertext": envelope.ciphertext,
+                },
+                compressed=compress,
+            ),
+        )
+
     return ApiResponse(success=True, data=BundleResponse(job_id=job_id, bundle=bundle, hooks=hooks))
 
 
@@ -187,7 +218,11 @@ def _get_active_node(runtime, node_id: str) -> ActiveNode:
             raise HTTPException(status_code=403, detail={"code": "AUTH_NODE_DISABLED", "message": "node is disabled"})
         if node.status != "active":
             raise HTTPException(status_code=401, detail={"code": "AUTH_NODE_NOT_APPROVED", "message": "node not approved"})
-        return ActiveNode(node_id=node.node_id, public_key_pem=node.public_key)
+        return ActiveNode(
+            node_id=node.node_id,
+            public_key_pem=node.public_key,
+            encryption_public_key_pem=node.encryption_public_key,
+        )
 
 
 def _touch_node_last_seen(runtime, node_id: str) -> None:
@@ -301,3 +336,12 @@ def _load_job_bundle_files(runtime, entry_name: str) -> dict:
         "domains": entry_domains(entry),
         "files": files,
     }
+
+
+def load_x25519_public_key_from_pem(pem: str):
+    """Load an X25519 public key from a PEM string (not a file path)."""
+    from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PublicKey
+    key = serialization.load_pem_public_key(pem.encode("utf-8"))
+    if not isinstance(key, X25519PublicKey):
+        raise ValueError("encryption_public_key must be X25519")
+    return key

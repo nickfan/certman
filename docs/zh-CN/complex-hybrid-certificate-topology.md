@@ -366,11 +366,71 @@ certman-scheduler run --loop
 
 ## 9. 安全与治理建议
 
-- 凭据最小权限：DNS 仅授予 TXT 记录所需权限。
-- 私钥保护：落盘目录最小权限，避免共享存储裸露。
-- 传输加密：端点分发走 TLS 与签名校验。
-- 防重放与审计：任务请求签名、nonce、事件留痕。
-- 变更窗口：证书轮转尽量在低峰期，支持灰度发布与快速回滚。
+### 9.1 安全基线（默认开启）
+
+- **Bearer Token 鉴权**（ctl 通道）：所有 `certman-ctl` 远程请求须携带共享密钥 Token，防止未授权访问。
+- **Ed25519 签名 + Nonce 防重放**（agent 通道）：每次 agent 请求都需要 Ed25519 签名覆盖 `node_id/timestamp/nonce/payload`，nonce 在服务端 TTL 1h 内保持唯一，防御重放攻击。
+- **凭据最小权限**：DNS 操作仅授予 TXT 记录所需权限。
+- **私钥保护**：落盘目录最小权限，避免共享存储裸露。
+- **防重放与审计**：任务请求签名、nonce、事件留痕。
+- **变更窗口**：证书轮转尽量在低峰期，支持灰度发布与快速回滚。
+
+### 9.2 可选：bundle 内容加密（bundle_encryption = "encrypt"）
+
+默认模式下，agent 下载的证书包（bundle）以明文 JSON 传输，完整性由 TLS + 签名保证。对于需要更高保密等级的场景，可开启 **X25519 ECIES 信封加密**：
+
+| 安全等级 | 配置 | 保护效果 | 额外开销 |
+| --- | --- | --- | --- |
+| 默认（`none`） | `bundle_encryption = "none"` | TLS 传输保护 + Ed25519 请求认证 | 无 |
+| 信封加密（`encrypt`） | `bundle_encryption = "encrypt"` | + X25519 ECIES 内容加密（前向保密） | ≈1–5 ms/次，负载约 ×1.3–2 |
+
+> **资源代价说明**：信封加密依赖 X25519 ECDH 密钥交换 + AES-256-GCM，每次 bundle 下载约增加 1–5 ms 计算时间。bundle 超过 4 KiB 时服务端会自动 gzip 压缩再加密，进一步降低传输量。选择取决于业务对吞吐量和数据保密性的权衡。
+
+#### 服务端配置
+
+```toml
+[server]
+bundle_encryption = "encrypt"   # 对所有 agent bundle 下载开启信封加密
+```
+
+#### Agent 节点配置
+
+```toml
+[node_identity]
+# Ed25519 签名密钥（必须）
+private_key_path = "data/run/keys/node-a.pem"
+public_key_path = "data/run/keys/node-a.pub.pem"
+
+# X25519 加密密钥对（服务端开启 encrypt 模式时必须）
+encryption_private_key_path = "data/run/keys/node-a-enc.pem"
+encryption_public_key_path = "data/run/keys/node-a-enc.pub.pem"
+```
+
+#### 生成 X25519 加密密钥对
+
+```bash
+# 通过 certman identity 子命令（推荐）
+certman identity generate-x25519 \
+    --private data/run/keys/node-a-enc.pem \
+    --public  data/run/keys/node-a-enc.pub.pem
+```
+
+或通过 Python 直接调用：
+
+```python
+from certman.security.identity import generate_x25519_keypair
+generate_x25519_keypair(
+        "data/run/keys/node-a-enc.pem",
+        "data/run/keys/node-a-enc.pub.pem"
+)
+```
+
+#### 工作流程说明
+
+1. Agent 首次注册时，将 X25519 公钥（PEM）随注册请求一并提交，服务端持久化于节点记录中。
+2. 服务端在 `bundle_encryption = "encrypt"` 且节点有加密公钥时，将明文 bundle 用节点 X25519 公钥做 ECIES 封装（HKDF-SHA256 派生 + AES-256-GCM 加密）后返回。
+3. Agent 检测到响应中包含 `envelope` 字段时，自动用本地 X25519 私钥解密，还原明文 bundle。
+4. 如果服务端未开启加密或节点无加密公钥，bundle 退回明文模式，兼容旧版 agent。
 
 ## 10. 典型落地映射表
 

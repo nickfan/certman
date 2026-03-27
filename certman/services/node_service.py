@@ -20,9 +20,17 @@ class NodeService:
     def __init__(self, *, db_path):
         self._session_factory = make_session_factory(db_path)
 
-    def register_node(self, *, node_id: str, node_type: str, public_key: str) -> NodeRegisterResult:
+    def register_node(
+        self,
+        *,
+        node_id: str,
+        node_type: str,
+        public_key: str,
+        encryption_public_key: str | None = None,
+    ) -> NodeRegisterResult:
         now = datetime.now(timezone.utc)
         normalized_key = public_key.strip()
+        normalized_enc_key = encryption_public_key.strip() if encryption_public_key else None
         with self._session_factory() as session:
             existing = session.query(NodeORM).filter(NodeORM.node_id == node_id).first()
             if existing is None:
@@ -31,6 +39,7 @@ class NodeService:
                         node_id=node_id,
                         node_type=node_type,
                         public_key=normalized_key,
+                        encryption_public_key=normalized_enc_key,
                         status="active",
                         last_seen=None,
                         created_at=now,
@@ -53,9 +62,13 @@ class NodeService:
 
             same_key = (existing.public_key or "").strip() == normalized_key
             if same_key:
-                if existing.status != "active" or existing.node_type != node_type:
+                changed = existing.status != "active" or existing.node_type != node_type
+                enc_changed = normalized_enc_key is not None and (existing.encryption_public_key or "").strip() != normalized_enc_key
+                if changed or enc_changed:
                     existing.status = "active"
                     existing.node_type = node_type
+                    if enc_changed:
+                        existing.encryption_public_key = normalized_enc_key
                     existing.updated_at = now
                     session.commit()
                 return NodeRegisterResult(node_id=node_id, status="active", created=False)
@@ -66,6 +79,8 @@ class NodeService:
             existing.public_key = normalized_key
             existing.node_type = node_type
             existing.status = "active"
+            if normalized_enc_key is not None:
+                existing.encryption_public_key = normalized_enc_key
             existing.updated_at = now
             session.commit()
             return NodeRegisterResult(node_id=node_id, status="active", created=False)

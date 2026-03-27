@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import gzip
 import json
 from pathlib import Path
 from uuid import uuid4
@@ -9,7 +10,8 @@ from uuid import uuid4
 import httpx
 from cryptography.hazmat.primitives import serialization
 
-from certman.security.identity import load_ed25519_private_key
+from certman.security.envelope import Envelope, decrypt_envelope
+from certman.security.identity import load_ed25519_private_key, load_x25519_private_key, load_x25519_public_key
 from certman.security.signing import sign_message
 
 
@@ -71,6 +73,8 @@ class NodePoller:
         public_key_path: str | Path | None = None,
         node_type: str = "agent",
         register_token: str | None = None,
+        encryption_private_key_path: str | Path | None = None,
+        encryption_public_key_path: str | Path | None = None,
     ):
         """
         Initialize agent poller.
@@ -82,6 +86,10 @@ class NodePoller:
             public_key_path: Corresponding public key (optional, can be derived)
             node_type: Label for server records (default: "agent")
             register_token: One-time registration token (from admin, env: CERTMAN_NODE_REGISTRATION_TOKEN)
+            encryption_private_key_path: X25519 private key for bundle decryption (optional).
+                When provided the poller will also submit the corresponding public key at
+                registration time, and automatically decrypt ECIES-encrypted bundle responses.
+            encryption_public_key_path: X25519 public key path (optional; derived from private key if absent).
         """
         self._endpoint = endpoint
         self._node_id = node_id
@@ -89,6 +97,8 @@ class NodePoller:
         self._public_key_path = Path(public_key_path) if public_key_path else None
         self._node_type = node_type
         self._register_token = register_token
+        self._encryption_private_key_path = Path(encryption_private_key_path) if encryption_private_key_path else None
+        self._encryption_public_key_path = Path(encryption_public_key_path) if encryption_public_key_path else None
         self._last_registration = RegistrationOutcome(success=True, retryable=False, code="REGISTER_NOT_REQUIRED", message="registration not required")
 
     @property
@@ -164,7 +174,10 @@ class NodePoller:
             response = httpx.get(endpoint, params=params, timeout=10)
             if response.status_code != 200:
                 return None
-            return response.json().get("data")
+            data = response.json().get("data")
+            if data is None:
+                return None
+            return self._maybe_decrypt_bundle(data)
         except (httpx.HTTPError, ValueError):
             return None
 
@@ -252,6 +265,11 @@ class NodePoller:
             "public_key": public_key_pem,
             "register_token": self._register_token,
         }
+        # If an X25519 encryption keypair is configured, include the public key so
+        # the server can encrypt bundle responses (opt-in end-to-end encryption).
+        enc_pem = self._resolve_encryption_public_key_pem()
+        if enc_pem:
+            payload["encryption_public_key"] = enc_pem
         try:
             response = httpx.post(f"{self._endpoint.rstrip('/')}/api/v1/nodes/register", json=payload, timeout=10)
             if response.status_code in (200, 201):
@@ -294,3 +312,42 @@ class NodePoller:
     @staticmethod
     def _job_payload_bytes(job_id: str) -> bytes:
         return json.dumps({"job_id": job_id}, separators=(",", ":"), sort_keys=True).encode("utf-8")
+
+    def _resolve_encryption_public_key_pem(self) -> str | None:
+        """Return X25519 public key PEM if encryption keypair is configured."""
+        if self._encryption_private_key_path is None or not self._encryption_private_key_path.exists():
+            return None
+        if self._encryption_public_key_path is not None and self._encryption_public_key_path.exists():
+            return self._encryption_public_key_path.read_text(encoding="utf-8")
+        # Derive public key from private key.
+        priv = load_x25519_private_key(self._encryption_private_key_path)
+        return priv.public_key().public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        ).decode("utf-8")
+
+    def _maybe_decrypt_bundle(self, data: dict) -> dict:
+        """Return data unchanged (plaintext) or decrypt envelope if present."""
+        if "envelope" not in data or data["envelope"] is None:
+            return data
+        # Encrypted mode: decrypt using local X25519 private key.
+        if self._encryption_private_key_path is None or not self._encryption_private_key_path.exists():
+            # No local decryption key; return as-is so caller can handle the error.
+            return data
+        priv = load_x25519_private_key(self._encryption_private_key_path)
+        env_dict = data["envelope"]
+        envelope = Envelope(
+            ephemeral_public_key=env_dict["ephemeral_public_key"],
+            nonce=env_dict["nonce"],
+            ciphertext=env_dict["ciphertext"],
+        )
+        plaintext = decrypt_envelope(priv, envelope)
+        if data.get("compressed", False):
+            plaintext = gzip.decompress(plaintext)
+        inner = json.loads(plaintext.decode("utf-8"))
+        # Merge job_id from outer envelope into decrypted payload.
+        return {
+            "job_id": data.get("job_id"),
+            "bundle": inner.get("bundle"),
+            "hooks": inner.get("hooks", []),
+        }

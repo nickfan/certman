@@ -38,6 +38,10 @@ class ServerConfig(BaseModel):
     listen_port: int = 8000
     signing_key_path: str | None = None  # Ed25519 private key; required in Phase 4
     token_auth_enabled: bool = False
+    # Bundle security level: "none" (default) = plaintext JSON after Ed25519 auth;
+    # "encrypt" = X25519 ECIES envelope (AES-256-GCM) applied to bundle content.
+    # Requires node to register with encryption_public_key.
+    bundle_encryption: Literal["none", "encrypt"] = "none"
 
 
 class SchedulerConfig(BaseModel):
@@ -54,6 +58,14 @@ class NodeIdentityConfig(BaseModel):
     private_key_path: str
     public_key_path: str | None = None
     certificate_store_path: str | None = None
+    # Optional X25519 keypair for bundle envelope decryption.
+    # When set the agent will also register encryption_public_key with the server,
+    # enabling end-to-end encrypted bundle delivery when server bundle_encryption=encrypt.
+    encryption_private_key_path: str | None = None
+    encryption_public_key_path: str | None = None
+    # When True, content is gzip-compressed before encryption (reduces transmitted bytes
+    # at the cost of extra CPU; only takes effect when encryption is also enabled).
+    bundle_compress: bool = False
 
 
 class HookConfig(BaseModel):

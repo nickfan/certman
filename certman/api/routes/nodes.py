@@ -5,6 +5,7 @@ import hmac
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PublicKey
 from fastapi import APIRouter, HTTPException, Request, Response, status
 
 from certman.api.schemas import ApiResponse, NodeRegisterRequest, NodeRegisterResponse
@@ -36,6 +37,7 @@ def register_node(payload: NodeRegisterRequest, request: Request, response: Resp
         )
 
     fingerprint = _validate_and_fingerprint_ed25519(payload.public_key)
+    enc_fingerprint = _validate_and_fingerprint_x25519(payload.encryption_public_key) if payload.encryption_public_key else None
 
     db_path = resolve_runtime_path(runtime, runtime.config.server.db_path)
     service = NodeService(db_path=db_path)
@@ -44,6 +46,7 @@ def register_node(payload: NodeRegisterRequest, request: Request, response: Resp
             node_id=payload.node_id,
             node_type=payload.node_type,
             public_key=payload.public_key,
+            encryption_public_key=payload.encryption_public_key,
         )
     except ValueError as exc:
         raise HTTPException(
@@ -60,6 +63,7 @@ def register_node(payload: NodeRegisterRequest, request: Request, response: Resp
             created=result.created,
             public_key_fingerprint=fingerprint,
             poll_endpoint="/api/v1/node-agent/poll",
+            encryption_key_fingerprint=enc_fingerprint,
         ),
     )
 
@@ -77,6 +81,28 @@ def _validate_and_fingerprint_ed25519(public_key_pem: str) -> str:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail={"code": "INVALID_PUBLIC_KEY_ALGORITHM", "message": "public_key must be Ed25519"},
+        )
+
+    raw_bytes = key.public_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PublicFormat.Raw,
+    )
+    return sha256(raw_bytes).hexdigest()
+
+
+def _validate_and_fingerprint_x25519(public_key_pem: str) -> str:
+    try:
+        key = serialization.load_pem_public_key(public_key_pem.encode("utf-8"))
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"code": "INVALID_ENCRYPTION_KEY", "message": "encryption_public_key is not valid PEM"},
+        ) from exc
+
+    if not isinstance(key, X25519PublicKey):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"code": "INVALID_ENCRYPTION_KEY_ALGORITHM", "message": "encryption_public_key must be X25519"},
         )
 
     raw_bytes = key.public_bytes(

@@ -70,6 +70,16 @@ def run(
             else None
         ),
         register_token=os.getenv("CERTMAN_NODE_REGISTRATION_TOKEN"),
+        encryption_private_key_path=(
+            resolve_runtime_path(runtime, runtime.config.node_identity.encryption_private_key_path)
+            if runtime.config.node_identity.encryption_private_key_path
+            else None
+        ),
+        encryption_public_key_path=(
+            resolve_runtime_path(runtime, runtime.config.node_identity.encryption_public_key_path)
+            if runtime.config.node_identity.encryption_public_key_path
+            else None
+        ),
     )
 
     executor = NodeExecutor()

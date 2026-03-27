@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import gzip
 import json
 from pathlib import Path
 
@@ -10,9 +11,12 @@ from certman.api.app import create_app
 from certman.config import create_runtime, resolve_runtime_path
 from certman.db.engine import make_session_factory
 from certman.db.models import NodeORM
+from certman.security.envelope import Envelope, decrypt_envelope
 from certman.security.identity import (
     generate_ed25519_keypair,
+    generate_x25519_keypair,
     load_ed25519_private_key,
+    load_x25519_private_key,
 )
 from certman.security.signing import sign_message
 from certman.services.job_service import JobService
@@ -309,6 +313,120 @@ def test_node_agent_poll_throttles_last_seen_updates(tmp_path: Path) -> None:
         node = session.query(NodeORM).filter(NodeORM.node_id == "node-a").first()
         assert node.last_seen_updated_at > first_updated_at
 
+
+def test_node_agent_bundle_download_encrypted(tmp_path: Path) -> None:
+    """Bundle returned as ECIES envelope when server bundle_encryption=encrypt and node has X25519 key."""
+    data_dir = tmp_path / "data"
+    conf_dir = data_dir / "conf"
+    key_dir = data_dir / "run" / "keys"
+    conf_dir.mkdir(parents=True)
+    key_dir.mkdir(parents=True)
+
+    node_private = key_dir / "node-a.pem"
+    node_public = key_dir / "node-a.pub.pem"
+    node_enc_private = key_dir / "node-a-enc.pem"
+    node_enc_public = key_dir / "node-a-enc.pub.pem"
+    server_private = key_dir / "server.pem"
+    server_public = key_dir / "server.pub.pem"
+    generate_ed25519_keypair(node_private, node_public)
+    generate_x25519_keypair(node_enc_private, node_enc_public)
+    generate_ed25519_keypair(server_private, server_public)
+
+    (conf_dir / "config.toml").write_text(
+        """
+run_mode = "server"
+
+[global]
+data_dir = "data"
+email = "ops@example.com"
+
+[server]
+db_path = "data/run/certman.db"
+listen_host = "127.0.0.1"
+listen_port = 8000
+signing_key_path = "data/run/keys/server.pem"
+bundle_encryption = "encrypt"
+
+[[entries]]
+name = "site-a"
+primary_domain = "site-a.example.com"
+dns_provider = "route53"
+""".strip(),
+        encoding="utf-8",
+    )
+
+    runtime = create_runtime(data_dir=str(data_dir), config_file="config.toml")
+    db_path = resolve_runtime_path(runtime, runtime.config.server.db_path)
+    job_service = JobService(db_path=db_path)
+
+    # Seed cert files
+    live_dir = runtime.paths.run_dir / "letsencrypt" / "live" / "site-a.example.com"
+    live_dir.mkdir(parents=True)
+    (live_dir / "fullchain.pem").write_text("FULLCHAIN", encoding="utf-8")
+    (live_dir / "privkey.pem").write_text("PRIVKEY", encoding="utf-8")
+
+    session_factory = make_session_factory(db_path)
+    with session_factory() as session:
+        session.add(
+            NodeORM(
+                node_id="node-a",
+                node_type="agent",
+                public_key=node_public.read_text(encoding="utf-8"),
+                encryption_public_key=node_enc_public.read_text(encoding="utf-8"),
+                status="active",
+            )
+        )
+        session.commit()
+
+    created_job = job_service.create_job(job_type="issue", subject_id="site-a", node_id="node-a")
+    job_service.update_status(created_job.job_id, status="running")
+
+    client = TestClient(create_app(data_dir=str(data_dir), config_file="config.toml"))
+
+    private_key = load_ed25519_private_key(node_private)
+    timestamp = int(datetime.now(timezone.utc).timestamp())
+    payload_bytes = json.dumps({"job_id": created_job.job_id}, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    signature = sign_message(
+        private_key,
+        node_id="node-a",
+        timestamp=timestamp,
+        nonce="nonce-enc-bundle",
+        payload=payload_bytes,
+    )
+
+    response = client.get(
+        f"/api/v1/node-agent/bundles/{created_job.job_id}",
+        params={
+            "node_id": "node-a",
+            "timestamp": timestamp,
+            "nonce": "nonce-enc-bundle",
+            "signature": signature,
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()["data"]
+
+    # Plaintext bundle should be absent
+    assert data["bundle"] is None
+    # Envelope must be present
+    assert data["envelope"] is not None
+    assert "ephemeral_public_key" in data["envelope"]
+    assert "nonce" in data["envelope"]
+    assert "ciphertext" in data["envelope"]
+
+    # Decrypt with node's X25519 private key
+    enc_priv = load_x25519_private_key(node_enc_private)
+    envelope = Envelope(
+        ephemeral_public_key=data["envelope"]["ephemeral_public_key"],
+        nonce=data["envelope"]["nonce"],
+        ciphertext=data["envelope"]["ciphertext"],
+    )
+    plaintext = decrypt_envelope(enc_priv, envelope)
+    if data.get("compressed", False):
+        plaintext = gzip.decompress(plaintext)
+    inner = json.loads(plaintext.decode("utf-8"))
+    assert inner["bundle"]["files"]["fullchain.pem"] == "FULLCHAIN"
+    assert inner["bundle"]["files"]["privkey.pem"] == "PRIVKEY"
 
 def test_node_agent_bundle_download_with_signature(tmp_path: Path) -> None:
     client, node_private_path, db_path = _prepare_server_with_node(tmp_path)

@@ -322,11 +322,71 @@ certman-scheduler run --loop
 
 ## 9. Security and Governance Notes
 
-- Least-privilege DNS credentials
-- Minimal key exposure on disk
-- TLS + signature verification for delivery paths
-- Nonce replay protection and auditing
-- Low-traffic rotation windows and rollback strategy
+### 9.1 Security Baseline (always active)
+
+- **Bearer Token auth** (ctl channel): all `certman-ctl` remote requests must carry a shared-secret token.
+- **Ed25519 signature + nonce replay protection** (agent channel): every agent request must carry an Ed25519 signature over `node_id/timestamp/nonce/payload`; nonces are tracked server-side with a 1-hour TTL, blocking replay attacks.
+- **Least-privilege DNS credentials**: DNS operations are scoped to TXT-record changes only.
+- **Minimal key exposure on disk**: delivery directories use restrictive permissions.
+- **Nonce replay protection and auditing**: request signing, nonces, and event logging.
+- **Low-traffic rotation windows**: certificate rotation is scheduled in off-peak windows with rollback support.
+
+### 9.2 Optional: bundle envelope encryption (`bundle_encryption = "encrypt"`)
+
+By default, the certificate bundle downloaded by agents is transmitted as plaintext JSON, protected by TLS and request signatures. For higher confidentiality requirements, **X25519 ECIES envelope encryption** can be enabled:
+
+| Security Level | Config | Protection | Overhead |
+| --- | --- | --- | --- |
+| Default (`none`) | `bundle_encryption = "none"` | TLS transit + Ed25519 auth | None |
+| Envelope encryption (`encrypt`) | `bundle_encryption = "encrypt"` | + X25519 ECIES content encryption (forward secrecy) | ≈1–5 ms/request, ~1.3–2× payload |
+
+> **Resource trade-off**: Envelope encryption uses X25519 ECDH key agreement + AES-256-GCM. Each bundle download adds approximately 1–5 ms CPU time. Bundles larger than 4 KiB are automatically gzip-compressed before encryption to reduce transfer size. The choice depends on throughput vs. confidentiality requirements.
+
+#### Server configuration
+
+```toml
+[server]
+bundle_encryption = "encrypt"   # enable envelope encryption for all agent bundle downloads
+```
+
+#### Agent node configuration
+
+```toml
+[node_identity]
+# Ed25519 signing keys (required)
+private_key_path = "data/run/keys/node-a.pem"
+public_key_path = "data/run/keys/node-a.pub.pem"
+
+# X25519 encryption key pair (required when server uses encrypt mode)
+encryption_private_key_path = "data/run/keys/node-a-enc.pem"
+encryption_public_key_path = "data/run/keys/node-a-enc.pub.pem"
+```
+
+#### Generating an X25519 encryption key pair
+
+```bash
+# Via certman identity subcommand (recommended)
+certman identity generate-x25519 \
+    --private data/run/keys/node-a-enc.pem \
+    --public  data/run/keys/node-a-enc.pub.pem
+```
+
+Or directly in Python:
+
+```python
+from certman.security.identity import generate_x25519_keypair
+generate_x25519_keypair(
+        "data/run/keys/node-a-enc.pem",
+        "data/run/keys/node-a-enc.pub.pem"
+)
+```
+
+#### How it works
+
+1. On first registration, the agent submits its X25519 public key (PEM) alongside the registration request; the server persists it in the node record.
+2. When `bundle_encryption = "encrypt"` and the node has an encryption public key, the server wraps the bundle with ECIES (HKDF-SHA256 key derivation + AES-256-GCM) before returning it.
+3. When the agent detects an `envelope` field in the response, it automatically decrypts using its local X25519 private key.
+4. If the server has encryption disabled, or the node lacks an encryption key, the bundle falls back to plaintext mode — backwards-compatible with older agents.
 
 ## 10. Target Mapping Table
 

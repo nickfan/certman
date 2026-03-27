@@ -160,6 +160,12 @@ class NodeRegisterResponse(BaseModel):
     created: bool = Field(description="Whether the node record was newly created", examples=[True])
     public_key_fingerprint: str = Field(description="SHA-256 fingerprint of submitted Ed25519 public key")
     poll_endpoint: str = Field(description="Relative poll endpoint exposed by control plane", examples=["/api/v1/node-agent/poll"])
+    # Echoed back when the node registered an encryption key;
+    # None when no encryption_public_key was submitted.
+    encryption_key_fingerprint: str | None = Field(
+        default=None,
+        description="SHA-256 fingerprint of submitted X25519 encryption public key, if provided",
+    )
 
 
 class PollRequest(BaseModel):
@@ -211,8 +217,16 @@ class ResultReportRequest(BaseModel):
 class NodeRegisterRequest(BaseModel):
     node_id: str = Field(description="Unique node identifier", examples=["node-a"])
     node_type: str = Field(default="agent", description="Node type label", examples=["agent"])
-    public_key: str = Field(description="PEM-encoded Ed25519 public key")
+    public_key: str = Field(description="PEM-encoded Ed25519 public key (used for request signing)")
     register_token: str = Field(description="One-time node registration token", examples=["registration-token"])
+    # Optional: submit X25519 public key at registration time.
+    # When provided and the server has bundle_encryption=encrypt configured,
+    # bundle responses will be ECIES-encrypted so private key material
+    # is never transmitted in plaintext over the wire.
+    encryption_public_key: str | None = Field(
+        default=None,
+        description="Optional PEM-encoded X25519 public key for bundle envelope encryption",
+    )
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -221,6 +235,7 @@ class NodeRegisterRequest(BaseModel):
                 "node_type": "agent",
                 "public_key": "-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----",
                 "register_token": "registration-token",
+                "encryption_public_key": None,
             }
         }
     )
@@ -247,5 +262,14 @@ class ConfigValidateResponse(BaseModel):
 
 class BundleResponse(BaseModel):
     job_id: str = Field(description="Assigned job ID", examples=["a1b2c3d4e5f6"])
-    bundle: dict = Field(description="Bundle payload for node execution")
-    hooks: list[dict] = Field(default_factory=list, description="Hook definitions to execute after delivery")
+    # Plaintext mode (bundle_encryption=none): bundle and hooks are populated,
+    # envelope is None.
+    bundle: dict | None = Field(default=None, description="Bundle payload (plaintext mode only)")
+    hooks: list[dict] = Field(default_factory=list, description="Hook definitions (plaintext mode only)")
+    # Encrypted mode (bundle_encryption=encrypt): envelope is populated,
+    # bundle and hooks are None / empty.
+    # The envelope contains {ephemeral_public_key, nonce, ciphertext} (base64-encoded).
+    # Plaintext inside the envelope is JSON: {"bundle": {...}, "hooks": [...]}.
+    # When compressed=True the JSON was gzip-compressed before encryption.
+    envelope: dict | None = Field(default=None, description="ECIES envelope (encrypted mode only)")
+    compressed: bool = Field(default=False, description="True when bundle JSON was gzip-compressed before encryption")
