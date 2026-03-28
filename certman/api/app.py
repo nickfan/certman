@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.exceptions import HTTPException
+from prometheus_client import REGISTRY, generate_latest
 
 from certman.api.routes.certificates import router as certificates_router
 from certman.api.routes.config import router as config_router
@@ -77,6 +78,11 @@ def create_app(*, data_dir: str = "data", config_file: str | None = None) -> Fas
     app.include_router(nodes_router)
     app.include_router(node_agent_router)
     app.include_router(webhooks_router)
+
+    @app.get("/metrics", include_in_schema=False, response_class=Response, tags=["monitoring"])
+    def metrics() -> Response:
+        """Prometheus metrics endpoint"""
+        return Response(content=generate_latest(REGISTRY), media_type="text/plain; charset=utf-8")
 
     @app.exception_handler(HTTPException)
     async def http_exception_handler(request, exc: HTTPException):

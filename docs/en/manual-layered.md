@@ -31,6 +31,8 @@ This manual focuses on parameters, behavior contracts, state machine semantics, 
 | scheduler.renew_before_days | queue renew before N days | 30 | Scheduler |
 | control_plane.endpoint | control plane base URL | n/a | Agent |
 | control_plane.poll_interval_seconds | poll interval seconds | 30 | Agent |
+| control_plane.prefer_sse | prefer SSE event channel first | false | Agent |
+| control_plane.sse_wait_seconds | SSE wait timeout seconds | 25 | Agent |
 | control_plane.prefer_subscribe | prefer subscribe long-poll first | false | Agent |
 | control_plane.subscribe_wait_seconds | subscribe wait timeout seconds | 25 | Agent |
 | node_identity.node_id | node unique id | n/a | Agent |
@@ -120,6 +122,7 @@ Provider credential requirements:
 - Swagger UI: `/docs`
 - ReDoc: `/redoc`
 - OpenAPI JSON: `/openapi.json`
+- Prometheus Metrics: `/metrics`
 
 These endpoints are exposed directly by `certman-server`.
 
@@ -237,6 +240,16 @@ Server behavior:
 - uses the same signature and nonce rules as poll
 - holds a long-poll request until job events or timeout
 - returns assignments immediately when available; otherwise returns empty assignments for poll fallback
+
+### 5.2.1 events (SSE)
+
+GET /api/v1/node-agent/events
+
+Server behavior:
+
+- accepts signed query parameters (`node_id/timestamp/nonce/signature`) to open SSE stream
+- emits `connected` event on handshake and `assignment` event when jobs are ready
+- emits `timeout` event when wait window expires; agent should fallback via `events -> subscribe -> poll`
 
 ### 5.3 heartbeat
 

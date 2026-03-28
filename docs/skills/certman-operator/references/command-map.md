@@ -71,6 +71,11 @@ Auth notes:
 - `--token <bearer>` is optional client override
 - env fallback order: `CERTMAN_MCP_TOKEN`, then `CERTMAN_SERVER_TOKEN`
 
+Related machine interfaces (outside MCP tool list):
+
+- Node SSE: `GET /api/v1/node-agent/events` (signed SSE, fallback chain: events -> subscribe -> poll)
+- Metrics: `GET /metrics`
+
 Tools:
 
 - `health`

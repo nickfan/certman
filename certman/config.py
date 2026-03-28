@@ -32,6 +32,8 @@ class ControlPlaneConfig(BaseModel):
     poll_interval_seconds: int = 30
     prefer_subscribe: bool = False
     subscribe_wait_seconds: int = 25
+    prefer_sse: bool = False
+    sse_wait_seconds: int = 25
 
 
 class ServerConfig(BaseModel):

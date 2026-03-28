@@ -77,6 +77,8 @@ class NodePoller:
         encryption_public_key_path: str | Path | None = None,
         prefer_subscribe: bool = False,
         subscribe_wait_seconds: int = 25,
+        prefer_sse: bool = False,
+        sse_wait_seconds: int = 25,
     ):
         """
         Initialize agent poller.
@@ -103,6 +105,8 @@ class NodePoller:
         self._encryption_public_key_path = Path(encryption_public_key_path) if encryption_public_key_path else None
         self._prefer_subscribe = prefer_subscribe
         self._subscribe_wait_seconds = max(0, subscribe_wait_seconds)
+        self._prefer_sse = prefer_sse
+        self._sse_wait_seconds = max(0, sse_wait_seconds)
         self._last_registration = RegistrationOutcome(success=True, retryable=False, code="REGISTER_NOT_REQUIRED", message="registration not required")
 
     @property
@@ -143,6 +147,11 @@ class NodePoller:
             "agent_version": "0.1.0",
             "signature": signature,
         }
+        if self._prefer_sse:
+            assignments = self._events()
+            if assignments is not None:
+                return assignments
+
         if self._prefer_subscribe:
             assignments = self._subscribe(payload)
             if assignments is not None:
@@ -171,6 +180,71 @@ class NodePoller:
             return response.json().get("data", {}).get("assignments", [])
         except (httpx.HTTPError, ValueError):
             return []
+
+    def _events(self) -> list[dict] | None:
+        if self._private_key_path is None or not self._private_key_path.exists():
+            return []
+
+        timestamp = int(datetime.now(timezone.utc).timestamp())
+        nonce = uuid4().hex
+        private_key = load_ed25519_private_key(self._private_key_path)
+        signed_payload = json.dumps({"channel": "events"}, separators=(",", ":"), sort_keys=True).encode("utf-8")
+        signature = sign_message(
+            private_key,
+            node_id=self._node_id,
+            timestamp=timestamp,
+            nonce=nonce,
+            payload=signed_payload,
+        )
+
+        params = {
+            "node_id": self._node_id,
+            "timestamp": timestamp,
+            "nonce": nonce,
+            "signature": signature,
+            "wait_seconds": self._sse_wait_seconds,
+        }
+
+        url = f"{self._endpoint.rstrip('/')}/api/v1/node-agent/events"
+        timeout = httpx.Timeout(connect=10.0, read=max(10.0, float(self._sse_wait_seconds + 10)), write=10.0, pool=10.0)
+        try:
+            with httpx.stream("GET", url, params=params, timeout=timeout) as response:
+                if response.status_code == 404:
+                    return None
+                if response.status_code != 200:
+                    return []
+
+                event_type = "message"
+                data_lines: list[str] = []
+                for raw_line in response.iter_lines():
+                    line = raw_line or ""
+                    if line.startswith(":"):
+                        continue
+                    if line == "":
+                        if data_lines:
+                            data_text = "\n".join(data_lines)
+                            if event_type == "assignment":
+                                parsed = json.loads(data_text)
+                                assignments = parsed.get("assignments")
+                                if isinstance(assignments, list):
+                                    return assignments
+                                return []
+                            if event_type == "timeout":
+                                return []
+                        event_type = "message"
+                        data_lines = []
+                        continue
+
+                    if line.startswith("event:"):
+                        event_type = line.split(":", 1)[1].strip()
+                        continue
+                    if line.startswith("data:"):
+                        data_lines.append(line.split(":", 1)[1].lstrip())
+
+                return []
+        except (httpx.HTTPError, ValueError, json.JSONDecodeError):
+            # Transport or parse errors should gracefully fallback to subscribe/poll.
+            return None
 
     def fetch_bundle(self, *, job_id: str, bundle_url: str, bundle_token: str | None = None) -> dict | None:
         if self._private_key_path is None or not self._private_key_path.exists():

@@ -82,6 +82,8 @@ def run(
         ),
         prefer_subscribe=runtime.config.control_plane.prefer_subscribe,
         subscribe_wait_seconds=runtime.config.control_plane.subscribe_wait_seconds,
+        prefer_sse=runtime.config.control_plane.prefer_sse,
+        sse_wait_seconds=runtime.config.control_plane.sse_wait_seconds,
     )
 
     executor = NodeExecutor()

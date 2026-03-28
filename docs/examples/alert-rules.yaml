@@ -1,0 +1,215 @@
+# CertMan Agent Channel Alert Rules
+# Prometheus AlertManager 告警规则配置
+#
+# 部署方式：
+# 1. 将此文件复制到 Prometheus 的 rule_files 目录
+# 2. 在 prometheus.yml 中配置：
+#    rule_files:
+#      - "alert-rules.yaml"
+# 3. 重启 Prometheus
+
+groups:
+  - name: certman_agent_channel
+    interval: 30s
+    alert: []
+    rules:
+      # 告警 1：Subscribe 事件唤醒率过低（说明长轮询为主，事件推送失效）
+      - alert: CertManSubscribeEventWakeupRateLow
+        expr: |
+          (
+            certman_agent_subscribe_wakeup_total{wakeup_source="event"}[5m]
+            /
+            (certman_agent_subscribe_wakeup_total{wakeup_source="event"}[5m] + certman_agent_subscribe_wakeup_total{wakeup_source="timeout"}[5m])
+          ) < 0.5
+        for: 5m
+        labels:
+          severity: warning
+          component: agent_channel
+        annotations:
+          summary: "CertMan subscribe event wakeup rate is low"
+          description: |
+            Node {{ $labels.node_id }} subscribe endpoint event wakeup rate is below 50%.
+            This indicates event-driven push is not working effectively, falling back to timeout-based polling.
+            
+            Current rate: {{ $value | humanizePercentage }}
+            
+            Recommendations:
+            - Check subscription_event_bus health
+            - Verify network connectivity to subscription broker
+            - Check server logs for event delivery failures
+
+      # 告警 2：Bundle token 过期率过高（Token TTL 配置过短或时钟偏差）
+      - alert: CertManBundleTokenExpiredRateHigh
+        expr: |
+          rate(certman_agent_bundle_token_expired_total[5m])
+          /
+          (rate(certman_agent_bundle_download_success_total[5m]) + rate(certman_agent_bundle_token_expired_total[5m]) + 1e-9)
+          > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: agent_channel
+        annotations:
+          summary: "CertMan bundle token expiration rate is high"
+          description: |
+            Node {{ $labels.node_id }} is experiencing high bundle token expiration rate (> 10%).
+            
+            Current rate: {{ $value | humanizePercentage }}
+            Job: {{ $labels.job_id }}
+            
+            Possible causes:
+            - bundle_token_ttl_seconds is too short (current: 300s, recommended: 600-900s)
+            - Agent system clock is drifting ahead of server
+            - Network latency is delaying bundle download
+            
+            Recommendations:
+            - Increase bundle_token_ttl_seconds in config
+            - Check NTP sync on agent nodes: timedatectl status
+            - Monitor network latency: mtr <control-plane-ip>
+
+      # 告警 3：Callback 成功率低于 95%
+      - alert: CertManCallbackSuccessRateLow
+        expr: |
+          (
+            certman_agent_callback_result_total{outcome="success"}[5m]
+            /
+            certman_agent_callback_result_total[5m]
+          ) < 0.95
+        for: 5m
+        labels:
+          severity: warning
+          component: agent_channel
+        annotations:
+          summary: "CertMan callback success rate is below 95%"
+          description: |
+            Node {{ $labels.node_id }} callback endpoint success rate has dropped below 95%.
+            
+            Current rate: {{ $value | humanizePercentage }}
+            
+            Possible causes:
+            - Agent network connectivity issues
+            - Control plane server overload
+            - Webhook serialization or encoding errors
+            
+            Recommendations:
+            - Check control plane server health: curl http://<server>:8000/health
+            - Review agent logs for callback errors
+            - Check network connectivity: ping <control-plane-ip>
+            - Monitor control plane CPU/memory usage
+
+      # 告警 4：活跃节点数突然下降（可能是大规模节点故障）
+      - alert: CertManActiveNodesDropped
+        expr: |
+          (
+            certman_active_nodes
+            /
+            certman_active_nodes offset 5m
+          ) < 0.8
+        for: 2m
+        labels:
+          severity: critical
+          component: agent_channel
+        annotations:
+          summary: "CertMan active nodes dropped significantly"
+          description: |
+            Active node count dropped by more than 20% in the last 5 minutes.
+            
+            Current: {{ $value | humanize }}
+            Previous: {{ query "certman_active_nodes offset 5m" | first | value | humanize }}
+            
+            This may indicate:
+            - Mass node restart/failure
+            - Control plane server crash or restart
+            - Network partition
+            - Database connectivity issues
+            
+            Action items:
+            - Immediately check control plane status
+            - Review control plane logs for errors
+            - Verify database connectivity and performance
+            - Check network for partition or latency issues
+
+      # 告警 5：Agent 认证失败率持续升高
+      - alert: CertManAgentAuthFailureRateHigh
+        expr: |
+          rate(certman_agent_auth_failure_total[5m]) > 0.01
+        for: 5m
+        labels:
+          severity: warning
+          component: agent_channel
+        annotations:
+          summary: "CertMan agent authentication failure rate is high"
+          description: |
+            Node {{ $labels.node_id }} is experiencing high authentication failure rate.
+            
+            Failure rate: {{ $value | humanizePercentage }}
+            Error code: {{ $labels.error_code }}
+            
+            Common causes:
+            - error_code=AUTH_INVALID_SIGNATURE: Node's Ed25519 key mismatch or signed payload mismatch
+            - error_code=REPLAY_ATTACK_DETECTED: Nonce replay or out-of-order request
+            - error_code=TIMESTAMP_EXPIRED: Agent system clock too far from server
+            
+            Recommendations:
+            - Check agent node's Ed25519 keys match server registration
+            - Verify agent system time: date  (should be within ±30 seconds of server)
+            - Check network for packet reordering: tcpdump on control plane
+            - Review agent logs for signing errors
+
+      # 告警 6：Subscribe 端点响应延迟过长
+      - alert: CertManSubscribeLatencyHigh
+        expr: |
+          histogram_quantile(0.95, rate(certman_agent_subscribe_wait_seconds_bucket[5m]))
+          > 30
+        for: 5m
+        labels:
+          severity: warning
+          component: agent_channel
+        annotations:
+          summary: "CertMan subscribe endpoint latency is high"
+          description: |
+            Node {{ $labels.node_id }} subscribe endpoint p95 latency is above 30 seconds.
+            
+            Current p95: {{ $value | humanizeDuration }}
+            
+            This indicates the event-driven wakeup is not responsive.
+            Consider these optimizations:
+            - Enable SSE (Server-Sent Events) for better performance
+            - Reduce subscribe_wait_seconds from 25 to 5-10
+            - Scale out control plane with load balancer
+            - Optimize event bus for high concurrency
+
+---
+
+# 告警路由配置示例（供参考）
+# 在 alertmanager.yml 的 route: 部分添加
+
+route:
+  routes:
+    - match:
+        severity: critical
+        component: agent_channel
+      receiver: oncall_pager
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 4h
+
+    - match:
+        severity: warning
+        component: agent_channel
+      receiver: slack_devops
+      group_wait: 1m
+      group_interval: 10m
+      repeat_interval: 12h
+
+receivers:
+  - name: oncall_pager
+    pagerduty_configs:
+      - service_key: ${PAGERDUTY_SERVICE_KEY}
+
+  - name: slack_devops
+    slack_configs:
+      - api_url: ${SLACK_WEBHOOK_URL}
+        channel: "#certman-alerts"
+        title: "{{ .GroupLabels.alertname }}"
+        text: "{{ .GroupLabels.severity }}: {{ .CommonAnnotations.summary }}"

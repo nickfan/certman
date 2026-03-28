@@ -16,6 +16,7 @@
 
 - `certman-server` 暴露的 HTTP REST API
 - FastAPI 自动生成的 OpenAPI schema
+- Prometheus 指标接口：`GET /metrics`
 - `certmanctl` 作为面向运维的 REST CLI 封装
 - `certman-mcp` 提供的 stdio MCP Server（封装控制面 API）
 
@@ -57,6 +58,7 @@ Token 解析优先级（override）：
 当前节点协议接口：
 
 - `POST /api/v1/node-agent/poll`
+- `GET /api/v1/node-agent/events`（SSE）
 - `POST /api/v1/node-agent/subscribe`
 - `POST /api/v1/node-agent/heartbeat`
 - `POST /api/v1/node-agent/result`
@@ -66,7 +68,8 @@ Token 解析优先级（override）：
 
 1. `poll/subscribe` 响应中的 assignment 可携带 `bundle_token` 与 `bundle_token_expires_at`。
 2. 当 `[server].bundle_token_required = true`（默认）时，下载 bundle 必须附带该短时 token。
-3. `subscribe` 为长轮询语义，建议 agent 开启 `control_plane.prefer_subscribe=true`。
+3. `events` 为签名 SSE 通道，事件类型包含 `connected/assignment/timeout`，建议 agent 配置优先 `control_plane.prefer_sse=true`。
+4. 推荐回退链路：`events -> subscribe -> poll`。
 
 示例配置：
 

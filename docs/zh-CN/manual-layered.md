@@ -31,6 +31,8 @@
 | scheduler.renew_before_days | 提前 N 天入队 renew | 30 | Scheduler |
 | control_plane.endpoint | 控制面地址 | 无 | Agent |
 | control_plane.poll_interval_seconds | 轮询周期（秒） | 30 | Agent |
+| control_plane.prefer_sse | 是否优先 SSE 事件通道 | false | Agent |
+| control_plane.sse_wait_seconds | SSE 单次等待秒数 | 25 | Agent |
 | control_plane.prefer_subscribe | 是否优先 subscribe 长轮询 | false | Agent |
 | control_plane.subscribe_wait_seconds | subscribe 等待秒数 | 25 | Agent |
 | node_identity.node_id | 节点唯一标识 | 无 | Agent |
@@ -133,6 +135,7 @@ provider 凭据要求：
 - Swagger UI: `/docs`
 - ReDoc: `/redoc`
 - OpenAPI JSON: `/openapi.json`
+- Prometheus Metrics: `/metrics`
 
 这些地址由 `certman-server` 直接暴露。
 
@@ -255,6 +258,16 @@ POST /api/v1/node-agent/subscribe
 - 与 poll 使用同一签名和 nonce 规则。
 - 服务端执行长轮询，等待作业事件或超时。
 - 命中任务时直接返回 assignments，未命中返回空列表并由 agent 回退到 poll。
+
+### 5.2.1 events (SSE)
+
+GET /api/v1/node-agent/events
+
+语义：
+
+- 使用签名查询参数建立 SSE 通道（`node_id/timestamp/nonce/signature`）。
+- 连接建立后先发送 `connected` 事件，再在任务到达时发送 `assignment` 事件。
+- 若等待窗口超时则发送 `timeout` 事件；agent 应按 `events -> subscribe -> poll` 链路回退。
 
 ### 5.3 heartbeat
 

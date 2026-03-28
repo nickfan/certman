@@ -348,6 +348,70 @@ def test_node_agent_subscribe_long_poll_delivers_assignment(tmp_path: Path) -> N
     assert assignments[0]["bundle_token"] is not None
 
 
+def test_node_agent_events_sse_delivers_assignment(tmp_path: Path) -> None:
+    client, node_private_path, db_path = _prepare_server_with_node(tmp_path)
+    private_key = load_ed25519_private_key(node_private_path)
+    job_service = JobService(db_path=db_path)
+    created_job = job_service.create_job(job_type="renew", subject_id="site-a", node_id="node-a")
+
+    timestamp = int(datetime.now(timezone.utc).timestamp())
+    signed_payload = json.dumps({"channel": "events"}, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    signature = sign_message(
+        private_key,
+        node_id="node-a",
+        timestamp=timestamp,
+        nonce="nonce-events-1",
+        payload=signed_payload,
+    )
+
+    response = client.get(
+        "/api/v1/node-agent/events",
+        params={
+            "node_id": "node-a",
+            "timestamp": timestamp,
+            "nonce": "nonce-events-1",
+            "signature": signature,
+            "wait_seconds": 1,
+        },
+    )
+
+    assert response.status_code == 200
+    assert "event: connected" in response.text
+    assert "event: assignment" in response.text
+    assert created_job.job_id in response.text
+
+
+def test_metrics_endpoint_exposes_agent_metrics(tmp_path: Path) -> None:
+    client, node_private_path, _ = _prepare_server_with_node(tmp_path)
+    private_key = load_ed25519_private_key(node_private_path)
+    timestamp = int(datetime.now(timezone.utc).timestamp())
+    signature = sign_message(
+        private_key,
+        node_id="node-a",
+        timestamp=timestamp,
+        nonce="nonce-metrics-1",
+        payload=b"",
+    )
+
+    poll_response = client.post(
+        "/api/v1/node-agent/poll",
+        json={
+            "node_id": "node-a",
+            "timestamp": timestamp,
+            "nonce": "nonce-metrics-1",
+            "agent_version": "0.1.0",
+            "signature": signature,
+        },
+    )
+    assert poll_response.status_code == 200
+
+    metrics_response = client.get("/metrics")
+    assert metrics_response.status_code == 200
+    assert "text/plain" in metrics_response.headers.get("content-type", "")
+    assert "certman_agent_poll_total" in metrics_response.text
+    assert "certman_agent_subscribe_wakeup_total" in metrics_response.text
+
+
 def test_node_agent_bundle_download_encrypted(tmp_path: Path) -> None:
     """Bundle returned as ECIES envelope when server bundle_encryption=encrypt and node has X25519 key."""
     data_dir = tmp_path / "data"

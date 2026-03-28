@@ -12,6 +12,7 @@ import time
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
 from sqlalchemy.exc import IntegrityError
 from cryptography.hazmat.primitives import serialization
 
@@ -27,6 +28,17 @@ from certman.security.signing import SecurityError, sign_message, verify_message
 from certman.services.cert_service import resolve_entry_cert_name
 from certman.services.job_service import JobService
 from certman.node_agent.subscribe_bus import subscription_event_bus
+from certman.monitoring.metrics import (
+    agent_auth_failure_total,
+    agent_poll_total,
+    bundle_download_success_total,
+    bundle_token_expired_total,
+    bundle_token_invalid_total,
+    callback_result_duration,
+    callback_result_total,
+    subscribe_wait_duration,
+    subscribe_wakeup_total,
+)
 
 router = APIRouter(prefix="/api/v1/node-agent", tags=["node-agent"])
 NONCE_TTL_SECONDS = 3600
@@ -47,6 +59,7 @@ class ActiveNode:
     response_description="Assignment list and minimum supported agent version",
 )
 def poll(payload: PollRequest, request: Request, service: JobService = Depends(get_job_service)) -> ApiResponse[PollResponse]:
+    agent_poll_total.labels(node_id=payload.node_id, endpoint="poll").inc()
     runtime = request.app.state.runtime
     node = _get_active_node(runtime, payload.node_id)
     public_key = serialization.load_pem_public_key(node.public_key_pem.encode("utf-8"))
@@ -60,6 +73,7 @@ def poll(payload: PollRequest, request: Request, service: JobService = Depends(g
             payload=b"",
         )
     except SecurityError as exc:
+        agent_auth_failure_total.labels(node_id=payload.node_id, error_code="AUTH_INVALID_SIGNATURE").inc()
         raise HTTPException(status_code=401, detail={"code": "AUTH_INVALID_SIGNATURE", "message": str(exc)}) from exc
 
     _store_nonce_or_conflict(runtime, payload.node_id, payload.nonce)
@@ -75,6 +89,8 @@ def poll(payload: PollRequest, request: Request, service: JobService = Depends(g
     description="Compatibility endpoint for push+pull hybrid mode. Reuses signed poll semantics.",
 )
 def subscribe(payload: PollRequest, request: Request, service: JobService = Depends(get_job_service)) -> ApiResponse[PollResponse]:
+    start = time.monotonic()
+    agent_poll_total.labels(node_id=payload.node_id, endpoint="subscribe").inc()
     runtime = request.app.state.runtime
     node = _get_active_node(runtime, payload.node_id)
     public_key = serialization.load_pem_public_key(node.public_key_pem.encode("utf-8"))
@@ -88,6 +104,7 @@ def subscribe(payload: PollRequest, request: Request, service: JobService = Depe
             payload=b"",
         )
     except SecurityError as exc:
+        agent_auth_failure_total.labels(node_id=payload.node_id, error_code="AUTH_INVALID_SIGNATURE").inc()
         raise HTTPException(status_code=401, detail={"code": "AUTH_INVALID_SIGNATURE", "message": str(exc)}) from exc
 
     _store_nonce_or_conflict(runtime, payload.node_id, payload.nonce)
@@ -96,6 +113,9 @@ def subscribe(payload: PollRequest, request: Request, service: JobService = Depe
     wait_seconds = min(120, max(0, int(request.query_params.get("wait_seconds", "25"))))
     response_payload = _claim_assignment_payload(runtime, service=service, node_id=payload.node_id)
     if response_payload.assignments:
+        duration = time.monotonic() - start
+        subscribe_wakeup_total.labels(node_id=payload.node_id, wakeup_source="event").inc()
+        subscribe_wait_duration.labels(node_id=payload.node_id, wakeup_source="event").observe(duration)
         return ApiResponse(success=True, data=response_payload)
 
     rev = subscription_event_bus.revision()
@@ -106,9 +126,105 @@ def subscribe(payload: PollRequest, request: Request, service: JobService = Depe
         rev = subscription_event_bus.revision()
         response_payload = _claim_assignment_payload(runtime, service=service, node_id=payload.node_id)
         if response_payload.assignments:
+            duration = time.monotonic() - start
+            subscribe_wakeup_total.labels(node_id=payload.node_id, wakeup_source="event").inc()
+            subscribe_wait_duration.labels(node_id=payload.node_id, wakeup_source="event").observe(duration)
             return ApiResponse(success=True, data=response_payload)
 
+    duration = time.monotonic() - start
+    subscribe_wakeup_total.labels(node_id=payload.node_id, wakeup_source="timeout").inc()
+    subscribe_wait_duration.labels(node_id=payload.node_id, wakeup_source="timeout").observe(duration)
     return ApiResponse(success=True, data=response_payload)
+
+
+@router.get(
+    "/events",
+    summary="SSE assignment notifications",
+    description="Signed SSE channel for assignment wakeup. Agent should fallback to subscribe/poll on errors.",
+)
+def events(
+    request: Request,
+    node_id: str = Query(..., description="Requesting node identifier"),
+    timestamp: int = Query(..., description="Unix timestamp in seconds"),
+    nonce: str = Query(..., description="Single-use nonce for replay protection"),
+    signature: str = Query(..., description="Ed25519 signature over node_id/timestamp/nonce/events payload"),
+    wait_seconds: int = Query(25, ge=0, le=120, description="Long-poll wait window in seconds"),
+    service: JobService = Depends(get_job_service),
+):
+    agent_poll_total.labels(node_id=node_id, endpoint="events").inc()
+    runtime = request.app.state.runtime
+    node = _get_active_node(runtime, node_id)
+    public_key = serialization.load_pem_public_key(node.public_key_pem.encode("utf-8"))
+    signed_payload = json.dumps({"channel": "events"}, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    try:
+        verify_message(
+            public_key,
+            signature,
+            node_id=node_id,
+            timestamp=timestamp,
+            nonce=nonce,
+            payload=signed_payload,
+        )
+    except SecurityError as exc:
+        agent_auth_failure_total.labels(node_id=node_id, error_code="AUTH_INVALID_SIGNATURE").inc()
+        raise HTTPException(status_code=401, detail={"code": "AUTH_INVALID_SIGNATURE", "message": str(exc)}) from exc
+
+    _store_nonce_or_conflict(runtime, node_id, nonce)
+    _touch_node_last_seen(runtime, node_id)
+
+    def _sse_stream():
+        start = time.monotonic()
+        connected = {
+            "node_id": node_id,
+            "server_time": int(datetime.now(timezone.utc).timestamp()),
+        }
+        yield f"event: connected\ndata: {json.dumps(connected, separators=(',', ':'))}\n\n"
+
+        immediate = _claim_assignment_payload(runtime, service=service, node_id=node_id)
+        if immediate.assignments:
+            duration = time.monotonic() - start
+            subscribe_wakeup_total.labels(node_id=node_id, wakeup_source="event").inc()
+            subscribe_wait_duration.labels(node_id=node_id, wakeup_source="event").observe(duration)
+            payload = {
+                "assignments": [assignment.model_dump() for assignment in immediate.assignments],
+                "min_agent_version": immediate.min_agent_version,
+            }
+            yield f"event: assignment\ndata: {json.dumps(payload, separators=(',', ':'))}\n\n"
+            return
+
+        rev = subscription_event_bus.revision()
+        deadline = time.monotonic() + wait_seconds
+        last_keepalive = time.monotonic()
+
+        while time.monotonic() < deadline:
+            now = time.monotonic()
+            remaining = max(0.0, deadline - now)
+            subscription_event_bus.wait_for_update(last_seen_revision=rev, timeout_seconds=min(1.0, remaining))
+            new_rev = subscription_event_bus.revision()
+            if new_rev != rev:
+                rev = new_rev
+                response_payload = _claim_assignment_payload(runtime, service=service, node_id=node_id)
+                if response_payload.assignments:
+                    duration = time.monotonic() - start
+                    subscribe_wakeup_total.labels(node_id=node_id, wakeup_source="event").inc()
+                    subscribe_wait_duration.labels(node_id=node_id, wakeup_source="event").observe(duration)
+                    payload = {
+                        "assignments": [assignment.model_dump() for assignment in response_payload.assignments],
+                        "min_agent_version": response_payload.min_agent_version,
+                    }
+                    yield f"event: assignment\ndata: {json.dumps(payload, separators=(',', ':'))}\n\n"
+                    return
+
+            if time.monotonic() - last_keepalive >= 10:
+                last_keepalive = time.monotonic()
+                yield f": keepalive {int(datetime.now(timezone.utc).timestamp())}\n\n"
+
+        duration = time.monotonic() - start
+        subscribe_wakeup_total.labels(node_id=node_id, wakeup_source="timeout").inc()
+        subscribe_wait_duration.labels(node_id=node_id, wakeup_source="timeout").observe(duration)
+        yield "event: timeout\ndata: {}\n\n"
+
+    return StreamingResponse(_sse_stream(), media_type="text/event-stream")
 
 
 @router.post(
@@ -119,6 +235,7 @@ def subscribe(payload: PollRequest, request: Request, service: JobService = Depe
 )
 def heartbeat(payload: PollRequest, request: Request, service: JobService = Depends(get_job_service)) -> ApiResponse[PollResponse]:
     del service
+    agent_poll_total.labels(node_id=payload.node_id, endpoint="heartbeat").inc()
     runtime = request.app.state.runtime
     node = _get_active_node(runtime, payload.node_id)
     public_key = serialization.load_pem_public_key(node.public_key_pem.encode("utf-8"))
@@ -132,6 +249,7 @@ def heartbeat(payload: PollRequest, request: Request, service: JobService = Depe
             payload=b"",
         )
     except SecurityError as exc:
+        agent_auth_failure_total.labels(node_id=payload.node_id, error_code="AUTH_INVALID_SIGNATURE").inc()
         raise HTTPException(status_code=401, detail={"code": "AUTH_INVALID_SIGNATURE", "message": str(exc)}) from exc
 
     _store_nonce_or_conflict(runtime, payload.node_id, payload.nonce)
@@ -192,7 +310,16 @@ def report_result(payload: ResultReportRequest, request: Request, service: JobSe
     description="Compatibility endpoint for webhook-style callback in push+pull mode. Reuses signed result semantics.",
 )
 def callback_result(payload: ResultReportRequest, request: Request, service: JobService = Depends(get_job_service)) -> ApiResponse[ResultAckResponse]:
-    return report_result(payload=payload, request=request, service=service)
+    start = time.monotonic()
+    try:
+        response = report_result(payload=payload, request=request, service=service)
+        callback_result_total.labels(node_id=payload.node_id, status=payload.status, outcome="success").inc()
+        callback_result_duration.labels(node_id=payload.node_id, outcome="success").observe(time.monotonic() - start)
+        return response
+    except HTTPException:
+        callback_result_total.labels(node_id=payload.node_id, status=payload.status, outcome="failure").inc()
+        callback_result_duration.labels(node_id=payload.node_id, outcome="failure").observe(time.monotonic() - start)
+        raise
 
 
 @router.get(
@@ -234,9 +361,14 @@ def download_bundle(
 
     if runtime.config.server and runtime.config.server.bundle_token_required:
         if not bundle_token:
+            bundle_token_invalid_total.labels(node_id=node_id, error_code="AUTH_BUNDLE_TOKEN_REQUIRED").inc()
             raise HTTPException(status_code=401, detail={"code": "AUTH_BUNDLE_TOKEN_REQUIRED", "message": "bundle token required"})
         token_ok, token_error = _verify_bundle_token(runtime, token=bundle_token, node_id=node_id, job_id=job_id)
         if not token_ok:
+            if token_error == "AUTH_BUNDLE_TOKEN_EXPIRED":
+                bundle_token_expired_total.labels(node_id=node_id, job_id=job_id).inc()
+            else:
+                bundle_token_invalid_total.labels(node_id=node_id, error_code=token_error or "AUTH_INVALID_BUNDLE_TOKEN").inc()
             raise HTTPException(status_code=401, detail={"code": token_error or "AUTH_INVALID_BUNDLE_TOKEN", "message": "invalid bundle token"})
 
     job = service.get_job(job_id)
@@ -262,6 +394,7 @@ def download_bundle(
             compress = True
         enc_pub = load_x25519_public_key_from_pem(node.encryption_public_key_pem)
         envelope = encrypt_envelope(enc_pub, plaintext)
+        bundle_download_success_total.labels(node_id=node_id, job_id=job_id).inc()
         return ApiResponse(
             success=True,
             data=BundleResponse(
@@ -277,6 +410,7 @@ def download_bundle(
             ),
         )
 
+    bundle_download_success_total.labels(node_id=node_id, job_id=job_id).inc()
     return ApiResponse(success=True, data=BundleResponse(job_id=job_id, bundle=bundle, hooks=hooks))
 
 

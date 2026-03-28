@@ -1,0 +1,26 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.8, pytest-9.0.2, pluggy-1.6.0
+rootdir: C:\Users\user\Code\github.com\nickfan\certman\worktree\certman
+configfile: pyproject.toml
+plugins: anyio-4.13.0
+collected 4 items / 1 error
+
+=================================== ERRORS ====================================
+________________ ERROR collecting tests/test_api_node_agent.py ________________
+ImportError while importing test module 'C:\Users\user\Code\github.com\nickfan\certman\worktree\certman\tests\test_api_node_agent.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Users\user\AppData\Roaming\uv\python\cpython-3.12.8-windows-x86_64-none\Lib\importlib\__init__.py:90: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_api_node_agent.py:10: in <module>
+    from certman.api.app import create_app
+certman\api\__init__.py:1: in <module>
+    from certman.api.app import create_app
+certman\api\app.py:6: in <module>
+    from prometheus_client import generate_latest, CollectorRegistry, REGISTRY
+E   ModuleNotFoundError: No module named 'prometheus_client'
+=========================== short test summary info ===========================
+ERROR tests/test_api_node_agent.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+============================== 1 error in 4.95s ===============================
