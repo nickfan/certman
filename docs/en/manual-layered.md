@@ -147,8 +147,10 @@ POST /api/v1/certificates
 202 response:
 
 ```json
-{"success":true,"data":{"job_id":"..."}}
+{"success":true,"data":{"job_id":"...","created":true}}
 ```
+
+If a queued issue job already exists for the same entry, the existing job is reused and `created=false`.
 
 GET /api/v1/certificates
 

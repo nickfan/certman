@@ -43,6 +43,23 @@ def test_post_certificates_returns_202_and_job_id(tmp_path: Path) -> None:
     payload = response.json()
     assert payload["success"] is True
     assert payload["data"]["job_id"]
+    assert payload["data"]["created"] is True
+
+
+def test_post_certificates_reuses_existing_queued_issue_job(tmp_path: Path) -> None:
+    client = _make_server_client(tmp_path)
+
+    first = client.post("/api/v1/certificates", json={"entry_name": "site-a"})
+    second = client.post("/api/v1/certificates", json={"entry_name": "site-a"})
+
+    first_payload = first.json()
+    second_payload = second.json()
+
+    assert first.status_code == 202
+    assert second.status_code == 202
+    assert first_payload["data"]["created"] is True
+    assert second_payload["data"]["created"] is False
+    assert first_payload["data"]["job_id"] == second_payload["data"]["job_id"]
 
 
 def test_get_job_returns_enveloped_job(tmp_path: Path) -> None:

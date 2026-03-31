@@ -73,6 +73,7 @@ class JobResponse(BaseModel):
 
 class JobAcceptedResponse(BaseModel):
     job_id: str = Field(description="Created issue job ID", examples=["a1b2c3d4e5f6"])
+    created: bool = Field(description="False when an existing queued issue job was reused", examples=[True])
 
 
 class RenewJobAcceptedResponse(BaseModel):

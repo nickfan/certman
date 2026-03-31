@@ -57,7 +57,7 @@ services:
   # Scheduler: Periodically scans certificates due for renewal and enqueues renew jobs
   certman-scheduler:
     build: .
-    entrypoint: ["uv", "run", "certman-scheduler", "--data-dir", "/data", "--config-file", "config.compose-server.toml", "--loop"]
+    entrypoint: ["uv", "run", "certman-scheduler", "run", "--data-dir", "/data", "--config-file", "config.compose-server.toml", "--loop"]
     volumes:
       - ./data:/data
 

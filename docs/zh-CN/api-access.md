@@ -108,6 +108,11 @@ token = "site-a-token"
 | `config show --entry-name <name>` | `GET /api/v1/config/entries/{entry_name}` |
 | `config validate --entry-name ...` | `POST /api/v1/config/validate` |
 
+证书任务提交接口当前都具备 queued 级幂等性：
+
+- `POST /api/v1/certificates` 返回 `{"job_id": "...", "created": bool}`
+- `POST /api/v1/certificates/{entry_name}/renew` 返回 `{"job_id": "...", "created": bool}`
+
 ## 3.1 `certman-mcp` 工具与 REST 对应
 
 | MCP tool | REST endpoint |

@@ -209,7 +209,7 @@ spec:
       - name: scheduler
         image: certman:local
         imagePullPolicy: Never
-        command: ["uv", "run", "certman-scheduler", "--data-dir", "/data", "--config-file", "config.toml", "--loop"]
+        command: ["uv", "run", "certman-scheduler", "run", "--data-dir", "/data", "--config-file", "config.toml", "--loop"]
         volumeMounts:
         - name: data
           mountPath: /data

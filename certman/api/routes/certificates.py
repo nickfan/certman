@@ -62,8 +62,8 @@ def get_certificate_jobs(
     response_model=ApiResponse[JobAcceptedResponse],
     status_code=status.HTTP_202_ACCEPTED,
     summary="Create issue job",
-    description="Submit a new certificate issuance job for a configured entry.",
-    response_description="Accepted issue job identifier",
+    description="Submit a certificate issuance job for a configured entry. If a queued issue job already exists for the same subject, the existing job is returned and `created=false`.",
+    response_description="Accepted issue job identifier and dedupe result",
     responses={404: {"description": "Certificate entry not found"}},
 )
 def issue_certificate(
@@ -80,15 +80,15 @@ def issue_certificate(
         raise HTTPException(status_code=404, detail={"code": "NOT_FOUND_ENTRY", "message": "entry not found"})
     require_entry_token_if_configured(http_request, payload.entry_name)
 
-    job = service.create_job(
+    job, created = service.enqueue_unique_job(
         job_type="issue",
         subject_id=payload.entry_name,
         target_type=entry.target_type,
         target_scope=entry.target_scope,
     )
-    if event_bus is not None:
+    if event_bus is not None and created:
         event_bus.publish("job.queued", job.model_dump())
-    return ApiResponse(success=True, data=JobAcceptedResponse(job_id=job.job_id))
+    return ApiResponse(success=True, data=JobAcceptedResponse(job_id=job.job_id, created=created))
 
 
 @router.post(

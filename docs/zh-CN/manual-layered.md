@@ -162,8 +162,10 @@ POST /api/v1/certificates
 响应（202）：
 
 ```json
-{"success":true,"data":{"job_id":"..."}}
+{"success":true,"data":{"job_id":"...","created":true}}
 ```
+
+若同条目已经存在 queued 的 issue job，则复用已有 job，并返回 `created=false`。
 
 GET /api/v1/certificates
 

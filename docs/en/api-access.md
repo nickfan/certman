@@ -108,6 +108,11 @@ token = "site-a-token"
 | `config show --entry-name <name>` | `GET /api/v1/config/entries/{entry_name}` |
 | `config validate --entry-name ...` | `POST /api/v1/config/validate` |
 
+Certificate submission endpoints are queue-idempotent:
+
+- `POST /api/v1/certificates` returns `{"job_id": "...", "created": bool}`
+- `POST /api/v1/certificates/{entry_name}/renew` returns `{"job_id": "...", "created": bool}`
+
 ## 3.1 `certman-mcp` tools map
 
 | MCP tool | REST endpoint |
