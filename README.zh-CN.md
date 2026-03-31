@@ -4,6 +4,19 @@
 
 基于 certbot 和 DNS 插件的 SSL 证书管理 CLI。
 
+当前一等支持的 DNS provider：
+
+- Aliyun DNS
+- Cloudflare DNS
+- AWS Route53
+
+当前一等支持的交付目标：
+
+- filesystem / generic 文件落盘
+- nginx / openresty 类文件布局
+- Kubernetes TLS Secret（`k8s-ingress`）
+- AWS ACM 导入（`aws-acm`）
+
 ## 运行模式
 
 CertMan 现在基于同一套配置和 service 层提供四个运行入口：
@@ -61,6 +74,48 @@ uv run certman --data-dir data check --warn-days 30 --force-renew-days 7
   - `letsencrypt/`: certbot 状态目录（建议）
 - `data/log/`: 日志目录（忽略）
 - `data/output/`: 导出证书目录（忽略）
+
+## 交付模型
+
+CertMan 把“证书签发/续签”和“证书分发”拆成两段。
+
+每个条目都可以额外声明 `delivery_targets`，这样在证书签发或续签成功后，可以继续做受控的后置动作，例如：
+
+- 把证书导入 AWS ACM
+- 更新 Traefik / Ingress 所消费的 Kubernetes TLS Secret
+
+最小示例：
+
+```toml
+description = "example.com via route53"
+primary_domain = "example.com"
+dns_provider = "route53"
+account_id = "AWS_DNS"
+
+[[delivery_targets]]
+enabled = true
+type = "aws-acm"
+account_id = "AWS_MAIN"
+[delivery_targets.options]
+regions = ["us-east-1"]
+
+[[delivery_targets]]
+enabled = true
+type = "k8s-ingress"
+scope = "kube-system/example-tls"
+[delivery_targets.options]
+mode = "apply"
+rollback_on_failure = true
+kubectl_bin = "kubectl"
+```
+
+说明：
+
+- `aws-acm` 适合后续由 AWS 托管服务消费证书的场景
+- 如果目标是 `CloudFront`，证书必须导入 `us-east-1`
+- `k8s-ingress` 会写入或 apply 标准 `kubernetes.io/tls` Secret
+- `delivery_targets` 是后置分发链，不会替代 DNS-01 的 provider 配置
+- 每个 delivery target 都是可选扩展能力，可通过 `enabled = true|false` 显式开关
 
 ## 镜像仓库
 

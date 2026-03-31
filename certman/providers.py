@@ -23,6 +23,15 @@ class Route53Credentials:
     access_key_id: str
     secret_access_key: str
     region: str
+    session_token: str | None = None
+
+
+@dataclass(frozen=True)
+class AwsCredentials:
+    access_key_id: str
+    secret_access_key: str
+    region: str
+    session_token: str | None = None
 
 
 def _resolve_value(value: str) -> str:
@@ -34,6 +43,22 @@ def _resolve_value(value: str) -> str:
             raise ValueError(f"missing env var for reference: {key}")
         return resolved
     return value
+
+
+def aws_credentials_for_account(account_id: str, *, default_region: str = "us-east-1") -> AwsCredentials:
+    account = normalize_account_id(account_id)
+    ak = os.getenv(f"CERTMAN_AWS_{account}_ACCESS_KEY_ID")
+    sk = os.getenv(f"CERTMAN_AWS_{account}_SECRET_ACCESS_KEY")
+    region = os.getenv(f"CERTMAN_AWS_{account}_REGION", default_region)
+    session_token = os.getenv(f"CERTMAN_AWS_{account}_SESSION_TOKEN")
+    if not ak or not sk:
+        raise ValueError(f"missing AWS env keys for account_id={account_id}")
+    return AwsCredentials(
+        access_key_id=ak,
+        secret_access_key=sk,
+        region=region,
+        session_token=session_token or None,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -134,21 +159,24 @@ def route53_credentials_for_entry(entry: EntryConfig) -> Route53Credentials:
                 if account
                 else "us-east-1"
             ),
+            session_token=(
+                _resolve_value(creds.api_token)
+                if creds.api_token
+                else os.getenv(f"CERTMAN_AWS_{account}_SESSION_TOKEN") if account else None
+            ),
         )
 
     # 2) account_id from env convention
     if not entry.account_id:
         raise ValueError("route53 entry missing account_id or credentials")
 
-    ak = os.getenv(f"CERTMAN_AWS_{account}_ACCESS_KEY_ID")
-    sk = os.getenv(f"CERTMAN_AWS_{account}_SECRET_ACCESS_KEY")
-    region = os.getenv(f"CERTMAN_AWS_{account}_REGION", "us-east-1")
-    if not ak or not sk:
-        raise ValueError(
-            f"missing route53 env keys for account_id={entry.account_id}"
-        )
-
-    return Route53Credentials(access_key_id=ak, secret_access_key=sk, region=region)
+    creds_for_account = aws_credentials_for_account(entry.account_id, default_region="us-east-1")
+    return Route53Credentials(
+        access_key_id=creds_for_account.access_key_id,
+        secret_access_key=creds_for_account.secret_access_key,
+        region=creds_for_account.region,
+        session_token=creds_for_account.session_token,
+    )
 
 
 def write_route53_credentials_ini(path: Path, creds: Route53Credentials) -> None:

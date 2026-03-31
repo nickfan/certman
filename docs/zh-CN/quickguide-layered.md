@@ -46,6 +46,27 @@ CERTMAN_AWS_MAIN_SECRET_ACCESS_KEY=...
 CERTMAN_AWS_MAIN_REGION=us-east-1
 ```
 
+5. 可选：启用签发后的扩展交付
+
+```toml
+[[delivery_targets]]
+enabled = true
+type = "aws-acm"
+account_id = "AWS_MAIN"
+[delivery_targets.options]
+regions = ["us-east-1"]
+
+[[delivery_targets]]
+enabled = true
+type = "k8s-ingress"
+scope = "kube-system/example-tls"
+[delivery_targets.options]
+mode = "apply"
+rollback_on_failure = true
+```
+
+如果当前只需要签发/续签，不需要后置分发，直接不写 `delivery_targets` 即可。
+
 ## 1. CLI 层快速上手（单机）
 
 1. 校验配置

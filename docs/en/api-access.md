@@ -28,6 +28,8 @@ uv run certman-mcp --endpoint http://127.0.0.1:8000
 
 The MCP server uses stdio transport and exposes tools for health, certificate jobs, jobs query/wait, webhook CRUD, and read-only config query/validate.
 
+Config query responses now include optional `delivery_targets`, so operators and MCP clients can inspect whether extension deliveries such as `aws-acm` or `k8s-ingress` are enabled.
+
 Notes:
 
 1. `cert_create` and `cert_renew` are asynchronous: they return `job_id`; use `job_wait` to wait for terminal state.

@@ -4,6 +4,19 @@
 
 SSL certificate management CLI (certbot + DNS plugins).
 
+Current first-class DNS providers:
+
+- Aliyun DNS
+- Cloudflare DNS
+- AWS Route53
+
+Current first-class delivery targets:
+
+- filesystem / generic bundle
+- nginx / openresty-like file layouts
+- Kubernetes TLS Secret (`k8s-ingress`)
+- AWS ACM import (`aws-acm`)
+
 ## Runtime Modes
 
 CertMan now exposes four runtime surfaces built on the same config and service layer:
@@ -61,6 +74,53 @@ Default `--data-dir` is `data/` (configurable).
   - `letsencrypt/`: certbot state (recommended)
 - `data/log/`: execution logs (ignored), default keep 30 days
 - `data/output/`: user-facing exported artifacts (ignored)
+
+## Delivery model
+
+CertMan separates certificate issuance from certificate delivery.
+
+Each entry can optionally declare one or more `delivery_targets` so that a
+successful issue/renew job can continue with controlled post-processing, for
+example:
+
+- import the renewed certificate into AWS ACM
+- update a Kubernetes TLS Secret consumed by Traefik or Ingress
+
+Minimal example:
+
+```toml
+description = "example.com via route53"
+primary_domain = "example.com"
+dns_provider = "route53"
+account_id = "AWS_DNS"
+
+[[delivery_targets]]
+enabled = true
+type = "aws-acm"
+account_id = "AWS_MAIN"
+[delivery_targets.options]
+regions = ["us-east-1"]
+
+[[delivery_targets]]
+enabled = true
+type = "k8s-ingress"
+scope = "kube-system/example-tls"
+[delivery_targets.options]
+mode = "apply"
+rollback_on_failure = true
+kubectl_bin = "kubectl"
+```
+
+Notes:
+
+- `aws-acm` is the right target when the certificate will later be consumed by AWS
+  managed services such as CloudFront or regional load balancers.
+- CloudFront requires the viewer certificate to exist in `us-east-1`.
+- `k8s-ingress` writes or applies a standard `kubernetes.io/tls` Secret.
+- Delivery targets do not replace DNS issuance credentials; they are a second,
+  independent post-issue pipeline.
+- Each delivery target is optional and can be explicitly enabled or disabled
+  with `enabled = true|false`.
 
 ## Docker Image
 

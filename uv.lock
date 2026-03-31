@@ -174,10 +174,11 @@ wheels = [
 
 [[package]]
 name = "certman"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "alembic" },
+    { name = "boto3" },
     { name = "certbot" },
     { name = "certbot-dns-aliyun" },
     { name = "certbot-dns-cloudflare" },
@@ -206,6 +207,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "alembic", specifier = ">=1.16.5" },
+    { name = "boto3", specifier = ">=1.40.55" },
     { name = "certbot", specifier = ">=5.2.2" },
     { name = "certbot-dns-aliyun", specifier = ">=2.0.0" },
     { name = "certbot-dns-cloudflare", specifier = ">=3.2.0" },

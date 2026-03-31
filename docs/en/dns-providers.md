@@ -246,6 +246,21 @@ Notes:
 - if region is omitted in ops mode, current implementation defaults to `us-east-1`
 - certman writes a runtime AWS credentials file under `data/run/credentials/route53_<account>.ini`
 
+### Route53 issuance + ACM / k8s delivery
+
+If you issue through Route53 and want to continue with controlled delivery after
+renewal, keep DNS credentials and delivery credentials separate:
+
+- `account_id` on the entry can represent the DNS account used by certbot
+- each `delivery_targets[]` item can declare its own `account_id`
+- each `delivery_targets[]` item can also declare `enabled = true|false`
+- a common pattern is:
+  - DNS account: manage `_acme-challenge`
+  - AWS main account: import into ACM
+  - k8s runtime: update the TLS Secret consumed by Traefik / Ingress
+
+For CloudFront consumption, ACM import must target `us-east-1`.
+
 ## Validation And Issue/Renew Examples
 
 Validate config before issuing:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import os
 import tomllib
@@ -89,6 +89,14 @@ class CredentialsConfig(BaseModel):
     api_token: str | None = None
 
 
+class DeliveryTargetConfig(BaseModel):
+    enabled: bool = Field(default=True, description="Whether this delivery target is enabled")
+    type: str = Field(description="Delivery target type", examples=["aws-acm", "k8s-ingress"])
+    scope: str | None = Field(default=None, description="Delivery target scope", examples=["kube-system/yqnlink-us-wildcard-tls", "us-east-1"])
+    account_id: str | None = Field(default=None, description="Optional target account identifier for credential lookup")
+    options: dict[str, Any] = Field(default_factory=dict, description="Target-specific delivery options")
+
+
 class EntryConfig(BaseModel):
     name: str
     description: str = ""
@@ -108,6 +116,7 @@ class EntryConfig(BaseModel):
     # Delivery targeting metadata used by scheduler/job routing.
     target_type: str = "generic"
     target_scope: str | None = None
+    delivery_targets: list[DeliveryTargetConfig] = Field(default_factory=list)
 
 
 class AppConfig(BaseModel):
@@ -256,6 +265,19 @@ def entry_domains(entry: EntryConfig) -> list[str]:
     return unique
 
 
+def entry_delivery_targets(entry: EntryConfig) -> list[DeliveryTargetConfig]:
+    if entry.delivery_targets:
+        return [target for target in entry.delivery_targets if target.enabled]
+    if entry.target_type != "generic" or entry.target_scope:
+        return [
+            DeliveryTargetConfig(
+                type=entry.target_type,
+                scope=entry.target_scope,
+            )
+        ]
+    return []
+
+
 def _env_ref_key(value: str) -> str:
     return value[2:-1].strip()
 
@@ -322,7 +344,25 @@ def _required_env_keys(entry: EntryConfig, env: dict[str, str]) -> list[str]:
     else:
         raise ValueError(f"unsupported dns_provider: {entry.dns_provider}")
 
-    return [k for k in required if not env.get(k)]
+    missing.extend([k for k in required if not env.get(k)])
+
+    for target in entry.delivery_targets:
+        target_type = target.type.strip().lower()
+        target_account = normalize_account_id(target.account_id) if target.account_id else None
+        if target_type != "aws-acm" or not target_account:
+            continue
+        missing.extend(
+            [
+                key
+                for key in (
+                    f"CERTMAN_AWS_{target_account}_ACCESS_KEY_ID",
+                    f"CERTMAN_AWS_{target_account}_SECRET_ACCESS_KEY",
+                )
+                if not env.get(key)
+            ]
+        )
+
+    return missing
 
 
 @dataclass(frozen=True)

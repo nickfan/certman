@@ -46,6 +46,27 @@ CERTMAN_AWS_MAIN_SECRET_ACCESS_KEY=...
 CERTMAN_AWS_MAIN_REGION=us-east-1
 ```
 
+5. Optional: enable post-issue delivery extensions
+
+```toml
+[[delivery_targets]]
+enabled = true
+type = "aws-acm"
+account_id = "AWS_MAIN"
+[delivery_targets.options]
+regions = ["us-east-1"]
+
+[[delivery_targets]]
+enabled = true
+type = "k8s-ingress"
+scope = "kube-system/example-tls"
+[delivery_targets.options]
+mode = "apply"
+rollback_on_failure = true
+```
+
+Omit `delivery_targets` completely if you only want issuance/renewal without post-delivery.
+
 ## 1. CLI Layer Quick Start
 
 ```bash

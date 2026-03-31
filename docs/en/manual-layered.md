@@ -37,8 +37,10 @@ This manual focuses on parameters, behavior contracts, state machine semantics, 
 | control_plane.subscribe_wait_seconds | subscribe wait timeout seconds | 25 | Agent |
 | node_identity.node_id | node unique id | n/a | Agent |
 | node_identity.private_key_path | node private key path | n/a | Agent |
-| entries[].target_type | delivery target type (generic/nginx/openresty/k8s-ingress) | generic | Service/Agent |
+| entries[].target_type | legacy single delivery target type (generic/nginx/openresty/k8s-ingress) | generic | Service/Agent |
 | entries[].target_scope | delivery scope label (env/cluster) | null | Service/Agent |
+| entries[].delivery_targets[] | preferred multi-target delivery list (`aws-acm`, `k8s-ingress`, etc.) | [] | Service/Agent |
+| entries[].delivery_targets[].enabled | explicit on/off switch for an optional delivery target | true | Service/Agent |
 
 ## 3. CLI Command Manual
 

@@ -5,6 +5,7 @@ import typer
 from certman.config import create_runtime, resolve_runtime_path
 from certman.events import EventBus
 from certman.services.cert_service import CertService
+from certman.services.delivery_service import DeliveryService
 from certman.services.job_service import JobService
 
 app = typer.Typer(add_completion=False)
@@ -21,10 +22,17 @@ def run_once(*, data_dir: str = "data", config_file: str | None = None, event_bu
         return 0
 
     cert_service = CertService(runtime)
+    delivery_service = DeliveryService(runtime)
     try:
         if job.job_type == "issue":
             result = cert_service.issue(job.subject_id)
             if result.success:
+                delivery_result = delivery_service.deliver(job.subject_id)
+                if not delivery_result.success:
+                    updated = service.update_status(job.job_id, status="failed", error=delivery_result.error)
+                    if event_bus is not None and updated is not None:
+                        event_bus.publish("job.failed", updated.model_dump())
+                    return 1
                 updated = service.update_status(job.job_id, status="completed", result="ok")
                 if event_bus is not None and updated is not None:
                     event_bus.publish("job.completed", updated.model_dump())
@@ -40,6 +48,12 @@ def run_once(*, data_dir: str = "data", config_file: str | None = None, event_bu
                 if event_bus is not None and updated is not None:
                     event_bus.publish("job.failed", updated.model_dump())
             else:
+                delivery_result = delivery_service.deliver(job.subject_id)
+                if not delivery_result.success:
+                    updated = service.update_status(job.job_id, status="failed", error=delivery_result.error)
+                    if event_bus is not None and updated is not None:
+                        event_bus.publish("job.failed", updated.model_dump())
+                    return 1
                 updated = service.update_status(job.job_id, status="completed", result="ok")
                 if event_bus is not None and updated is not None:
                     event_bus.publish("job.completed", updated.model_dump())

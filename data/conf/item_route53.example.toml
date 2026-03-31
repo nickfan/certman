@@ -1,0 +1,58 @@
+# Entry item example for certman — AWS Route 53 DNS
+#
+# Prerequisite:
+#   uv run pip install certbot-dns-route53  (already installed via pyproject.toml)
+#
+# IAM policy required:
+#   route53:ListHostedZones
+#   route53:GetChange
+#   route53:ChangeResourceRecordSets  (on the target hosted zone)
+#
+# Filename convention: item_<name>.toml
+# This file is a template (.example.toml) and will NOT be loaded automatically.
+
+# name is optional; inferred from filename (item_route53.toml -> route53)
+# name = "example"
+description = "example.com via route53"
+primary_domain = "example.com"
+secondary_domains = ["www.example.com"]
+wildcard = true
+
+dns_provider = "route53"
+
+# --- Option A (ops mode): reference account_id, actual secrets come from data/conf/.env ---
+# Requires in .env:
+#   CERTMAN_AWS_AWS_EXAMPLE_ACCESS_KEY_ID=<your-ak>
+#   CERTMAN_AWS_AWS_EXAMPLE_SECRET_ACCESS_KEY=<your-sk>
+#   CERTMAN_AWS_AWS_EXAMPLE_REGION=us-east-1
+# account_id = "AWS_EXAMPLE"
+
+# --- Option B (portable mode): embed credentials directly or via ${ENV_VAR} ---
+# [credentials]
+# access_key_id     = "${AWS_ACCESS_KEY_ID}"
+# access_key_secret = "${AWS_SECRET_ACCESS_KEY}"
+
+# --- Optional delivery targets ---
+# Use when you want certman worker/agent to continue distributing the renewed
+# certificate after issuance.
+#
+# Example 1: import into ACM (good for CloudFront or regional LB consumers)
+# [[delivery_targets]]
+# enabled = true
+# type = "aws-acm"
+# account_id = "AWS_MAIN"
+# [delivery_targets.options]
+# regions = ["us-east-1", "us-west-2"]
+# [delivery_targets.options.tags]
+# env = "dev"
+# purpose = "edge-cert"
+#
+# Example 2: update Kubernetes TLS Secret consumed by Traefik / Ingress
+# [[delivery_targets]]
+# enabled = true
+# type = "k8s-ingress"
+# scope = "kube-system/example-tls"
+# [delivery_targets.options]
+# mode = "apply"
+# rollback_on_failure = true
+# kubectl_bin = "kubectl"

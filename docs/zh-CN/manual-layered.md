@@ -37,8 +37,10 @@
 | control_plane.subscribe_wait_seconds | subscribe 等待秒数 | 25 | Agent |
 | node_identity.node_id | 节点唯一标识 | 无 | Agent |
 | node_identity.private_key_path | 节点私钥路径 | 无 | Agent |
-| entries[].target_type | 目标类型（generic/nginx/openresty/k8s-ingress） | generic | Service/Agent |
+| entries[].target_type | 旧版单目标类型（generic/nginx/openresty/k8s-ingress） | generic | Service/Agent |
 | entries[].target_scope | 目标作用域（环境/集群标签） | null | Service/Agent |
+| entries[].delivery_targets[] | 推荐使用的多目标交付列表（如 `aws-acm`、`k8s-ingress`） | [] | Service/Agent |
+| entries[].delivery_targets[].enabled | 可选交付目标的显式开关 | true | Service/Agent |
 
 ## 3. CLI 命令手册
 

@@ -255,6 +255,9 @@ class ConfigEntryResponse(BaseModel):
     wildcard: bool = True
     dns_provider: str
     account_id: str | None = None
+    target_type: str = "generic"
+    target_scope: str | None = None
+    delivery_targets: list[dict] = Field(default_factory=list)
 
 
 class ConfigValidateRequest(BaseModel):

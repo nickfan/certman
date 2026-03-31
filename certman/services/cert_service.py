@@ -377,7 +377,7 @@ class CertService:
             "AWS_ACCESS_KEY_ID": creds.access_key_id,
             "AWS_SECRET_ACCESS_KEY": creds.secret_access_key,
             "AWS_DEFAULT_REGION": creds.region,
-            "AWS_SESSION_TOKEN": None,
+            "AWS_SESSION_TOKEN": creds.session_token,
             "AWS_PROFILE": None,
             "AWS_DEFAULT_PROFILE": None,
             "AWS_SHARED_CREDENTIALS_FILE": None,

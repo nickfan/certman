@@ -129,28 +129,27 @@ def test_deliver_k8s_bundle_dry_run_failed(tmp_path):
             missing_perms=[],
             diagnostics={"get_secrets": True, "create_secrets": True, "update_secrets": True},
         )
-    
-    with patch("certman.delivery.k8s._kubectl_dry_run") as mock_dry_run:
-        mock_dry_run.return_value = MagicMock(
-            success=False,
-            returncode=1,
-            stdout="",
-            stderr="error: invalid manifest: unknown field xyz",
-        )
-        
-        result = deliver_k8s_bundle(
-            files={"tls.crt": "CERT_DATA", "tls.key": "KEY_DATA"},
-            target_dir=tmp_path,
-            namespace="default",
-            secret_name="test-tls",
-            mode="apply",
-            enable_rbac_check=True,
-            dry_run_validation=True,
-        )
-        
-        assert result.success is False
-        assert result.error_code == K8sErrorCode.MANIFEST_INVALID
-        assert "invalid" in result.error_message.lower() or "unknown" in result.error_message.lower()
+        with patch("certman.delivery.k8s._kubectl_dry_run") as mock_dry_run:
+            mock_dry_run.return_value = MagicMock(
+                success=False,
+                returncode=1,
+                stdout="",
+                stderr="error: invalid manifest: unknown field xyz",
+            )
+
+            result = deliver_k8s_bundle(
+                files={"tls.crt": "CERT_DATA", "tls.key": "KEY_DATA"},
+                target_dir=tmp_path,
+                namespace="default",
+                secret_name="test-tls",
+                mode="apply",
+                enable_rbac_check=True,
+                dry_run_validation=True,
+            )
+
+            assert result.success is False
+            assert result.error_code == K8sErrorCode.MANIFEST_INVALID
+            assert "invalid" in result.error_message.lower() or "unknown" in result.error_message.lower()
 
 
 if __name__ == "__main__":

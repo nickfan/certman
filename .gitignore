@@ -9,6 +9,7 @@
 # Keep templates tracked
 !/data/conf/config.example.toml
 !/data/conf/item_example.example.toml
+!/data/conf/item_route53.example.toml
 !/data/conf/.env.example
 
 # Ignore legacy/temporary configs

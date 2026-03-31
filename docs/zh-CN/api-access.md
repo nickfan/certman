@@ -28,6 +28,8 @@ uv run certman-mcp --endpoint http://127.0.0.1:8000
 
 该 MCP Server 使用 stdio 传输，提供 health、证书任务、job 查询/等待、webhook CRUD、只读配置查询/校验等工具。
 
+配置查询接口现在会带上可选的 `delivery_targets` 信息，便于运维侧或 MCP 客户端判断 `aws-acm`、`k8s-ingress` 这类扩展交付是否启用。
+
 说明：
 
 1. `cert_create` 与 `cert_renew` 为异步语义，仅返回 `job_id`，需配合 `job_wait` 等待终态。
