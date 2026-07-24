@@ -36,6 +36,8 @@ jobs:
         run: uv lock --check
 
       - name: Run tests
+        env:
+          NO_COLOR: "1"
         run: uv run --frozen pytest
 
       - name: Validate release version
