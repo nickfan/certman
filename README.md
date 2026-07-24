@@ -129,7 +129,15 @@ Docker Hub: `nickfan/certman`
 GitHub Container Registry (GHCR): `ghcr.io/nickfan/certman`
 
 - `edge`: built from `master`
-- `latest` + `X.Y.Z`: built from git tags like `vX.Y.Z`
+- `sha-<commit>`: immutable build from `master`
+- `latest` + `X.Y.Z`: published automatically when `pyproject.toml` advances to
+  a version that does not already have a `vX.Y.Z` tag
+
+After the images are publicly verified, the same workflow creates the version
+tag and GitHub Release. Maintainers should update `pyproject.toml` and
+`uv.lock`, then merge to `master`; tags do not need to be created manually.
+See [Automated releases](docs/releasing.md) for the complete flow, required
+repository secrets, and the optional signed release webhook.
 
 If GHCR images are not pullable (403) even though workflow succeeded:
 
