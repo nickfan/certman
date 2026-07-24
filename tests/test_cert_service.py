@@ -165,6 +165,7 @@ def test_renew_all_route53_runs_each_entry_with_isolated_env(monkeypatch, tmp_pa
                     "access_key_id": "aws-ak-a",
                     "secret_access_key": "aws-sk-a",
                     "region": "us-east-1",
+                    "session_token": None,
                 },
             )()
         return type(
@@ -174,6 +175,7 @@ def test_renew_all_route53_runs_each_entry_with_isolated_env(monkeypatch, tmp_pa
                 "access_key_id": "aws-ak-b",
                 "secret_access_key": "aws-sk-b",
                 "region": "us-west-2",
+                "session_token": None,
             },
         )()
 
@@ -259,6 +261,7 @@ def test_renew_uses_cert_name_override_for_legacy_lineage(monkeypatch, tmp_path:
                 "access_key_id": "aws-ak",
                 "secret_access_key": "aws-sk",
                 "region": "us-east-1",
+                "session_token": None,
             },
         )(),
     )
@@ -516,6 +519,7 @@ def test_renew_all_preflights_all_entries_before_executing(monkeypatch, tmp_path
                 "access_key_id": f"aws-ak-{entry.account_id}",
                 "secret_access_key": f"aws-sk-{entry.account_id}",
                 "region": "us-east-1",
+                "session_token": None,
             },
         )(),
     )
@@ -634,6 +638,7 @@ def test_issue_route53_uses_aws_env_not_invalid_certbot_flag(monkeypatch, tmp_pa
                 "access_key_id": "aws-ak",
                 "secret_access_key": "aws-sk",
                 "region": "ap-southeast-1",
+                "session_token": None,
             },
         )(),
     )
@@ -654,4 +659,3 @@ def test_issue_route53_uses_aws_env_not_invalid_certbot_flag(monkeypatch, tmp_pa
     assert captured["env"]["AWS_DEFAULT_REGION"] == "ap-southeast-1"
     assert captured["env"]["AWS_PROFILE"] is None
     assert captured["env"]["AWS_SHARED_CREDENTIALS_FILE"] is None
-

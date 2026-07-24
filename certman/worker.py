@@ -5,6 +5,7 @@ import typer
 from certman.config import create_runtime, resolve_runtime_path
 from certman.events import EventBus
 from certman.services.cert_service import CertService
+from certman.services.certificate_inventory_service import CertificateInventoryService
 from certman.services.delivery_service import DeliveryService
 from certman.services.job_service import JobService
 
@@ -16,17 +17,20 @@ def run_once(*, data_dir: str = "data", config_file: str | None = None, event_bu
     if runtime.config.server is None:
         raise ValueError("server mode requires [server] configuration block")
 
-    service = JobService(db_path=resolve_runtime_path(runtime, runtime.config.server.db_path))
+    db_path = resolve_runtime_path(runtime, runtime.config.server.db_path)
+    service = JobService(db_path=db_path)
     job = service.claim_next_job()
     if job is None:
         return 0
 
     cert_service = CertService(runtime)
+    inventory_service = CertificateInventoryService(runtime, db_path=db_path)
     delivery_service = DeliveryService(runtime)
     try:
         if job.job_type == "issue":
             result = cert_service.issue(job.subject_id)
             if result.success:
+                inventory_service.sync_entry(job.subject_id)
                 delivery_result = delivery_service.deliver(job.subject_id)
                 if not delivery_result.success:
                     updated = service.update_status(job.job_id, status="failed", error=delivery_result.error)
@@ -48,6 +52,7 @@ def run_once(*, data_dir: str = "data", config_file: str | None = None, event_bu
                 if event_bus is not None and updated is not None:
                     event_bus.publish("job.failed", updated.model_dump())
             else:
+                inventory_service.sync_entry(job.subject_id)
                 delivery_result = delivery_service.deliver(job.subject_id)
                 if not delivery_result.success:
                     updated = service.update_status(job.job_id, status="failed", error=delivery_result.error)

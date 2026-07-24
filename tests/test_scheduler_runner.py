@@ -1,11 +1,25 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from typer.testing import CliRunner
 
+from certman.db.engine import make_session_factory
+from certman.db.models import CertificateORM
 from certman.scheduler.runner import _matches_cron, app, run_once
+from certman.services.job_service import JobService
+
+
+def _write_lineage(data_dir) -> None:
+    cert_name = "example.com"
+    letsencrypt_dir = data_dir / "run" / "letsencrypt"
+    renewal_dir = letsencrypt_dir / "renewal"
+    live_dir = letsencrypt_dir / "live" / cert_name
+    renewal_dir.mkdir(parents=True, exist_ok=True)
+    live_dir.mkdir(parents=True, exist_ok=True)
+    (renewal_dir / f"{cert_name}.conf").write_text("# test lineage\n", encoding="utf-8")
+    (live_dir / "cert.pem").write_text("test certificate", encoding="utf-8")
 
 
 def test_matches_cron_supports_step_and_exact_time() -> None:
@@ -82,6 +96,56 @@ renew_before_days = 18
     assert observed["renew_before_days"] == 18
     assert observed["target_scope"] is None
     assert isinstance(observed["entry_targets"], dict)
+
+
+def test_run_once_reconciles_existing_lineage_before_scheduling(monkeypatch, tmp_path) -> None:
+    data_dir = tmp_path / "data"
+    conf_dir = data_dir / "conf"
+    conf_dir.mkdir(parents=True)
+    (conf_dir / "config.toml").write_text(
+        """
+run_mode = "server"
+
+[global]
+data_dir = "data"
+email = "ops@example.com"
+
+[[entries]]
+name = "site-a"
+primary_domain = "example.com"
+dns_provider = "aliyun"
+
+[server]
+db_path = "data/run/certman.db"
+listen_host = "127.0.0.1"
+listen_port = 8000
+
+[scheduler]
+enabled = true
+renew_before_days = 30
+""".strip(),
+        encoding="utf-8",
+    )
+    expected_not_after = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(days=5)
+    _write_lineage(data_dir)
+    status = type("CertStatus", (), {"not_after": expected_not_after})()
+    monkeypatch.setattr(
+        "certman.services.certificate_inventory_service.get_cert_status",
+        lambda cert_path: status,
+    )
+
+    result = run_once(data_dir=str(data_dir), config_file="config.toml")
+
+    db_path = data_dir / "run" / "certman.db"
+    session_factory = make_session_factory(db_path)
+    with session_factory() as session:
+        certificate = session.query(CertificateORM).one()
+    jobs = JobService(db_path=db_path).list_jobs(subject_id="site-a")
+    assert result == 1
+    assert certificate.not_after == expected_not_after.replace(tzinfo=None)
+    assert len(jobs) == 1
+    assert jobs[0].job_type == "renew"
+    assert jobs[0].status == "queued"
 
 
 def test_matches_cron_requires_five_fields() -> None:

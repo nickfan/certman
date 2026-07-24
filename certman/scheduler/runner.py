@@ -7,6 +7,7 @@ import typer
 
 from certman.config import create_runtime, resolve_runtime_path
 from certman.scheduler.jobs import schedule_due_renewals
+from certman.services.certificate_inventory_service import CertificateInventoryService
 
 app = typer.Typer(add_completion=False)
 
@@ -91,6 +92,8 @@ def run_once(
 
     renew_days = renew_before_days if renew_before_days is not None else scheduler_cfg.renew_before_days
     db_path = resolve_runtime_path(runtime, runtime.config.server.db_path)
+    inventory_service = CertificateInventoryService(runtime, db_path=db_path)
+    inventory_service.reconcile_existing()
     entry_targets = {entry.name: (entry.target_type, entry.target_scope) for entry in runtime.config.entries}
     created_jobs = schedule_due_renewals(
         db_path=db_path,
