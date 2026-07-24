@@ -20,7 +20,15 @@ def test_entry_delivery_targets_prefers_new_multi_target_config() -> None:
                         {
                             "type": "aws-acm",
                             "account_id": "main-account",
-                            "options": {"regions": ["us-east-1", "us-west-2"]},
+                            "options": {
+                                "regions": ["us-east-1", "us-west-2"],
+                                "certificate_arn": {
+                                    "us-east-1": (
+                                        "arn:aws:acm:us-east-1:123456789012:"
+                                        "certificate/00000000-0000-0000-0000-000000000000"
+                                    )
+                                },
+                            },
                         },
                         {
                             "type": "k8s-ingress",
@@ -36,6 +44,9 @@ def test_entry_delivery_targets_prefers_new_multi_target_config() -> None:
     targets = entry_delivery_targets(cfg.entries[0])
     assert len(targets) == 2
     assert targets[0].type == "aws-acm"
+    assert targets[0].options["certificate_arn"]["us-east-1"].startswith(
+        "arn:aws:acm:us-east-1:123456789012:certificate/"
+    )
     assert targets[1].scope == "kube-system/yqnlink-us-wildcard-tls"
 
 

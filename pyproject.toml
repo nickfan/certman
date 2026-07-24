@@ -1,6 +1,6 @@
 [project]
 name = "certman"
-version = "0.2.2"
+version = "0.2.3"
 description = "SSL certificate management CLI (certbot + DNS plugins)"
 readme = "README.md"
 requires-python = ">=3.12"
