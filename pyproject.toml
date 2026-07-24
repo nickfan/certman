@@ -44,6 +44,7 @@ include = ["certman*"]
 
 [tool.pytest.ini_options]
 addopts = "-q"
+pythonpath = ["."]
 testpaths = ["tests"]
 
 [[tool.uv.index]]

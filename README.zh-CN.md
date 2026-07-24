@@ -125,7 +125,14 @@ kubectl_bin = "kubectl"
 标签策略：
 
 - `edge`: 来自 master
-- `latest` + `X.Y.Z`: 来自 `vX.Y.Z` 标签
+- `sha-<commit>`：master 每次构建的不可变标签
+- `latest` + `X.Y.Z`：当 `pyproject.toml` 升级到一个尚无 `vX.Y.Z`
+  标签的新版本时自动发布
+
+双仓库镜像公开拉取校验通过后，同一条流水线会自动创建版本标签和 GitHub
+Release。维护者只需更新 `pyproject.toml` 和 `uv.lock` 并合并到 master，不再
+需要手工创建标签。完整流程、所需仓库 Secrets 和可选签名发布 Webhook 见
+[自动化发布说明](docs/releasing.md)。
 
 ## Docker Compose 模式（推荐）
 
