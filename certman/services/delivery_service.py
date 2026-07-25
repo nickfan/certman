@@ -126,6 +126,7 @@ class DeliveryService:
                 account_id=account_id,
                 regions=regions,
                 tags=tags,
+                certificate_arn=options.get("certificate_arn"),
             )
         raise ValueError(f"unsupported delivery target_type: {target_type}")
 

@@ -100,6 +100,7 @@ type = "aws-acm"
 account_id = "AWS_MAIN"
 [delivery_targets.options]
 regions = ["us-east-1"]
+certificate_arn = { "us-east-1" = "arn:aws:acm:us-east-1:123456789012:certificate/00000000-0000-0000-0000-000000000000" }
 
 [[delivery_targets]]
 enabled = true
@@ -116,6 +117,14 @@ Notes:
 - `aws-acm` is the right target when the certificate will later be consumed by AWS
   managed services such as CloudFront or regional load balancers.
 - CloudFront requires the viewer certificate to exist in `us-east-1`.
+- To update an existing ACM certificate in place, set
+  `delivery_targets.options.certificate_arn`. Use a region-to-ARN mapping for
+  multi-region targets; a plain ARN string is accepted only when one region is
+  configured. CertMan verifies the active AWS account, region, primary domain,
+  `Type=IMPORTED`, and required tags before importing.
+- Without an explicit ARN, CertMan discovers imported certificates across all
+  supported RSA and EC key types. It creates a new ARN when none match and
+  fails closed when more than one certificate matches the domain and tags.
 - `k8s-ingress` writes or applies a standard `kubernetes.io/tls` Secret.
 - Delivery targets do not replace DNS issuance credentials; they are a second,
   independent post-issue pipeline.

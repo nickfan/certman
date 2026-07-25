@@ -55,6 +55,7 @@ type = "aws-acm"
 account_id = "AWS_MAIN"
 [delivery_targets.options]
 regions = ["us-east-1"]
+certificate_arn = { "us-east-1" = "arn:aws:acm:us-east-1:123456789012:certificate/00000000-0000-0000-0000-000000000000" }
 
 [[delivery_targets]]
 enabled = true
@@ -66,6 +67,14 @@ rollback_on_failure = true
 ```
 
 Omit `delivery_targets` completely if you only want issuance/renewal without post-delivery.
+
+For `aws-acm`, `certificate_arn` is optional. Configure it as a region-to-ARN
+mapping when an AWS service such as CloudFront must keep using the original
+ARN. A plain ARN string is also accepted for a single-region target. CertMan
+validates the active AWS account, region, primary domain, imported certificate
+type, and required tags before updating that ARN in place. Without an explicit
+ARN, CertMan searches all supported RSA and EC key types; multiple matching
+certificates cause a fail-closed error instead of an automatic guess.
 
 ## 1. CLI Layer Quick Start
 

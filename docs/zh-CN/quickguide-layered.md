@@ -55,6 +55,7 @@ type = "aws-acm"
 account_id = "AWS_MAIN"
 [delivery_targets.options]
 regions = ["us-east-1"]
+certificate_arn = { "us-east-1" = "arn:aws:acm:us-east-1:123456789012:certificate/00000000-0000-0000-0000-000000000000" }
 
 [[delivery_targets]]
 enabled = true
@@ -66,6 +67,13 @@ rollback_on_failure = true
 ```
 
 如果当前只需要签发/续签，不需要后置分发，直接不写 `delivery_targets` 即可。
+
+`aws-acm` 的 `certificate_arn` 是可选配置。当 CloudFront 等 AWS 服务必须
+继续引用原 ARN 时，建议按 region 配置 ARN 映射；只有一个 region 时也可直接
+填写 ARN 字符串。原位更新前，CertMan 会核验当前 AWS account、region、
+主域名、`Type=IMPORTED` 和预期 tags。未配置显式 ARN 时，CertMan 会搜索
+全部受支持的 RSA/EC key types；如果有多个证书同时匹配，则 fail closed，
+不会自动猜测。
 
 ## 1. CLI 层快速上手（单机）
 
