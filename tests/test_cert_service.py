@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from certman.config import AppConfig, Paths, Runtime
-from certman.services.cert_service import CertService
+from certman.services.cert_service import CertService, IssueResult
 
 
 def _runtime(tmp_path: Path) -> Runtime:
@@ -659,3 +659,25 @@ def test_issue_route53_uses_aws_env_not_invalid_certbot_flag(monkeypatch, tmp_pa
     assert captured["env"]["AWS_DEFAULT_REGION"] == "ap-southeast-1"
     assert captured["env"]["AWS_PROFILE"] is None
     assert captured["env"]["AWS_SHARED_CREDENTIALS_FILE"] is None
+
+
+def test_renew_reissues_when_provider_changed(monkeypatch, tmp_path: Path) -> None:
+    runtime = _runtime(tmp_path)
+    runtime.config.entries[0].dns_provider = "cloudflare"
+    runtime.config.entries[0].account_id = "yqnlink_dns"
+    monkeypatch.setenv("CERTMAN_CLOUDFLARE_YQNLINK_DNS_API_TOKEN", "token")
+    renewal_dir = runtime.paths.run_dir / "letsencrypt" / "renewal"
+    renewal_dir.mkdir(parents=True, exist_ok=True)
+    (renewal_dir / "example.com.conf").write_text("authenticator = dns-route53\n", encoding="utf-8")
+    service = CertService(runtime)
+    calls: dict[str, object] = {}
+
+    def fake_issue(name: str, *, force: bool = False, verbose: bool = False) -> IssueResult:
+        calls.update(name=name, force=force)
+        return IssueResult(True, name, ["example.com", "*.example.com"], runtime.paths.log_dir / "issue.log")
+
+    monkeypatch.setattr(service, "issue", fake_issue)
+    result = service.renew(name="site-a")[0]
+
+    assert result.success is True
+    assert calls == {"name": "site-a", "force": True}

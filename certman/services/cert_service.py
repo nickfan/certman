@@ -147,6 +147,7 @@ class CertService:
 
         if force:
             args.append("--force-renewal")
+            args.extend(["--cert-name", resolve_entry_cert_name(self._runtime, entry)])
 
         for domain in domains:
             args.extend(["-d", domain])
@@ -330,6 +331,35 @@ class CertService:
         dry_run: bool,
         verbose: bool,
     ) -> RenewResult:
+        renewal_conf = self._certbot_paths().config_dir / "renewal" / f"{plan.cert_name}.conf"
+        expected_authenticator = {
+            "aliyun": "dns-aliyun",
+            "cloudflare": "dns-cloudflare",
+            "route53": "dns-route53",
+        }[plan.entry.dns_provider.lower()]
+        stored_authenticator = None
+        if renewal_conf.exists():
+            for line in renewal_conf.read_text(encoding="utf-8").splitlines():
+                key, _, value = line.partition("=")
+                if key.strip() == "authenticator":
+                    stored_authenticator = value.strip()
+                    break
+        if stored_authenticator and stored_authenticator != expected_authenticator:
+            if dry_run:
+                raise ValueError(
+                    f"renewal provider changed from {stored_authenticator} to "
+                    f"{expected_authenticator}; dry-run cannot update lineage"
+                )
+            issued = self.issue(plan.entry.name, force=True, verbose=verbose)
+            return RenewResult(
+                success=issued.success,
+                entry_name=plan.entry.name,
+                renewed=issued.success,
+                log_path=issued.log_path,
+                admin_required=issued.admin_required,
+                error=issued.error,
+            )
+
         args: list[str] = ["renew", "--cert-name", plan.cert_name]
         if force:
             args.append("--force-renewal")
