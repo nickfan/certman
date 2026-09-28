@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+import sqlite3
 from pathlib import Path
 from uuid import uuid4
 
@@ -17,7 +18,30 @@ class JobService:
         self._db_path = Path(db_path)
         self._engine = make_engine(self._db_path)
         Base.metadata.create_all(self._engine)
+        self._migrate_legacy_job_uniqueness()
         self._session_factory = make_session_factory(self._db_path)
+
+    def _migrate_legacy_job_uniqueness(self) -> None:
+        # SQLite cannot drop a table-level UNIQUE constraint without rebuilding the table.
+        with sqlite3.connect(self._db_path, timeout=30) as db:
+            db.execute("BEGIN IMMEDIATE")
+            schema_row = db.execute(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND name='job'"
+            ).fetchone()
+            schema = schema_row[0] if schema_row else ""
+            legacy_constraint = "CONSTRAINT uq_job_type_subject_status UNIQUE (job_type, subject_id, status)"
+            if legacy_constraint in schema:
+                db.execute("DROP INDEX IF EXISTS ux_job_type_subject_queued")
+                db.execute("CREATE TABLE job_new (job_id VARCHAR(64) NOT NULL PRIMARY KEY, job_type VARCHAR(64) NOT NULL, subject_id VARCHAR(128) NOT NULL, target_type VARCHAR(64) NOT NULL, target_scope VARCHAR(128), node_id VARCHAR(128), status VARCHAR(32) NOT NULL, attempts INTEGER NOT NULL, result TEXT, error TEXT, created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL)")
+                columns = "job_id, job_type, subject_id, target_type, target_scope, node_id, status, attempts, result, error, created_at, updated_at"
+                db.execute(f"INSERT INTO job_new ({columns}) SELECT {columns} FROM job")
+                db.execute("DROP TABLE job")
+                db.execute("ALTER TABLE job_new RENAME TO job")
+                db.execute("CREATE INDEX IF NOT EXISTS ix_job_status ON job (status)")
+            db.execute("DROP INDEX IF EXISTS ux_job_type_subject_status")
+            db.execute("UPDATE job SET status = 'cancelled', error = COALESCE(error, 'normalized from abandoned recovery state') WHERE status IN ('stale', 'abandoned')")
+            db.execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_job_type_subject_queued ON job (job_type, subject_id) WHERE status = 'queued'")
+            db.commit()
 
     def create_job(
         self,
@@ -72,6 +96,15 @@ class JobService:
             updated_at=now,
         )
         with self._session_factory() as session:
+            existing = (
+                session.query(JobORM)
+                .filter(JobORM.job_type == job_type, JobORM.subject_id == subject_id)
+                .filter(JobORM.status.in_(("queued", "running")))
+                .order_by(JobORM.created_at.asc())
+                .first()
+            )
+            if existing is not None:
+                return self._to_record(existing), False
             try:
                 session.add(job)
                 session.commit()
@@ -80,10 +113,8 @@ class JobService:
                 session.rollback()
                 existing = (
                     session.query(JobORM)
-                    .filter(JobORM.job_type == job_type)
-                    .filter(JobORM.subject_id == subject_id)
+                    .filter(JobORM.job_type == job_type, JobORM.subject_id == subject_id)
                     .filter(JobORM.status == "queued")
-                    .order_by(JobORM.created_at.asc())
                     .first()
                 )
                 if existing is None:
@@ -136,6 +167,11 @@ class JobService:
     ) -> JobRecord | None:
         now = datetime.now(timezone.utc)
         with self._session_factory() as session:
+            # ponytail: a two-hour lease assumes certificate jobs finish sooner; add heartbeats if longer jobs become normal.
+            session.query(JobORM).filter(
+                JobORM.status == "running", JobORM.updated_at < now - timedelta(hours=2)
+            ).update({JobORM.status: "failed", JobORM.error: "worker lease expired", JobORM.updated_at: now})
+            session.commit()
             row = session.execute(
                 text(
                     """

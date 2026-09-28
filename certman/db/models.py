@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Integer, String, Text, UniqueConstraint
+from sqlalchemy import DateTime, Index, Integer, String, Text, UniqueConstraint, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -25,7 +25,13 @@ class CertificateORM(Base):
 class JobORM(Base):
     __tablename__ = "job"
     __table_args__ = (
-        UniqueConstraint("job_type", "subject_id", "status", name="uq_job_type_subject_status"),
+        Index(
+            "ux_job_type_subject_queued",
+            "job_type",
+            "subject_id",
+            unique=True,
+            sqlite_where=text("status = 'queued'"),
+        ),
     )
 
     job_id: Mapped[str] = mapped_column(String(64), primary_key=True)

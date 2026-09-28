@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
 
 from certman.services.job_service import JobService
@@ -59,3 +60,40 @@ def test_job_service_list_jobs_supports_target_scope(tmp_path: Path) -> None:
 
     assert len(office_jobs) == 1
     assert office_jobs[0].subject_id == "site-a"
+
+
+def test_enqueue_unique_job_reuses_running_job(tmp_path: Path) -> None:
+    service = JobService(db_path=tmp_path / "certman.db")
+    first = service.create_job(job_type="renew", subject_id="site-a")
+    service.update_status(first.job_id, status="running")
+
+    second, created = service.enqueue_unique_job(job_type="renew", subject_id="site-a")
+
+    assert created is False
+    assert second.job_id == first.job_id
+
+
+def test_claim_next_job_reclaims_expired_running_job(tmp_path: Path) -> None:
+    service = JobService(db_path=tmp_path / "certman.db")
+    stale = service.create_job(job_type="renew", subject_id="site-a")
+    service.update_status(stale.job_id, status="running")
+    queued = service.create_job(job_type="renew", subject_id="site-b")
+    with sqlite3.connect(tmp_path / "certman.db") as db:
+        db.execute("UPDATE job SET updated_at = '2020-01-01 00:00:00' WHERE job_id = ?", (stale.job_id,))
+        db.commit()
+
+    claimed = service.claim_next_job()
+
+    assert claimed is not None
+    assert claimed.job_id == queued.job_id
+    assert service.get_job(stale.job_id).status == "failed"
+
+
+def test_terminal_jobs_can_share_type_subject(tmp_path: Path) -> None:
+    service = JobService(db_path=tmp_path / "certman.db")
+    first = service.create_job(job_type="issue", subject_id="site-a")
+    service.update_status(first.job_id, status="completed", result="ok")
+    second = service.create_job(job_type="issue", subject_id="site-a")
+    service.update_status(second.job_id, status="completed", result="ok")
+
+    assert service.get_job(second.job_id).status == "completed"
